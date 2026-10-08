@@ -1,0 +1,7 @@
+{
+  "android_rewarded_id": "ca-app-pub-3940256099942544/5224354917",
+  "android_interstitial_id": "ca-app-pub-3940256099942544/1033173712",
+  "ios_rewarded_id": "ca-app-pub-3940256099942544/1712485313",
+  "ios_interstitial_id": "ca-app-pub-3940256099942544/4411468910",
+  "NOTE": "Replace these test IDs with your real AdMob IDs. Copy this file as ad_config.json (which is gitignored)."
+}
