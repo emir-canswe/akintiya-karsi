@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c6a755f92479ea47980903af09d1425, type: 3}
+  m_Name: SpawnConfig
+  m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.SpawnConfig
+  minSpawnInterval: 150
+  maxSpawnInterval: 230
+  intervalReductionPerDifficulty: 50
+  foodPerLineMin: 3
+  foodPerLineMax: 6
+  goldFoodBaseChance: 0.07
+  goldFoodChanceIncrease: 0.05
+  baseSharkSpeed: 70
+  sharkSpeedIncrease: 90
+  sharkTrackingSpeed: 55
+  minLogWidthRatio: 0.42
+  maxLogWidthRatio: 0.58
+  logWidthIncreasePerDifficulty: 0.1
+  diff0FoodLineWeight: 1
+  diff0RockWeight: 1
+  diff0LogWeight: 1
+  diff0SharkWeight: 1
+  diff0HookWeight: 1
+  diff1FoodLineWeight: 1
+  diff1RockWeight: 1
+  diff1LogWeight: 1
+  diff1SharkWeight: 1
+  diff1HookWeight: 1
+  largeSharksAfterStage: 3

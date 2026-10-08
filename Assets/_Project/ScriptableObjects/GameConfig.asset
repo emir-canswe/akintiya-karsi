@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b7e80ef7e9d5a5429306ee8860ebe74, type: 3}
+  m_Name: GameConfig
+  m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.GameConfig
+  startSpeed: 150
+  maxSpeed: 380
+  speedIncrease: 3.2
+  playerMoveSmoothing: 12
+  turboSpeedMultiplier: 1.7
+  turboTime: 3.2
+  maxHP: 3
+  invincibilityDuration: 1.3
+  continueHP: 2
+  continueInvincibility: 2.2
+  powerPerFood: 12
+  maxPower: 100
+  riverHalfWidth: 150
+  playerRadius: 14
+  distanceToMetersDivisor: 10
+  deathAnimDuration: 1

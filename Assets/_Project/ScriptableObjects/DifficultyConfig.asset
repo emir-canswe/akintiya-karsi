@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: df80a6d31c96ecc498f148b8ea39794d, type: 3}
+  m_Name: DifficultyConfig
+  m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.DifficultyConfig
+  difficultyRampDistance: 5000
+  regions:
+  - regionName: Mountain Creek
+    startDistance: 0
+    waterColor1: {r: 0.2, g: 0.8, b: 0.9, a: 1}
+    waterColor2: {r: 0.1, g: 0.6, b: 0.7, a: 1}
+    bankColor: {r: 0.3, g: 0.6, b: 0.2, a: 1}
+    grassColor: {r: 0.4, g: 0.8, b: 0.3, a: 1}
+    speedMultiplier: 1
+  - regionName: Wide Lake
+    startDistance: 10000
+    waterColor1: {r: 0.1, g: 0.3, b: 0.8, a: 1}
+    waterColor2: {r: 0.05, g: 0.2, b: 0.6, a: 1}
+    bankColor: {r: 0.9, g: 0.8, b: 0.6, a: 1}
+    grassColor: {r: 0.8, g: 0.7, b: 0.5, a: 1}
+    speedMultiplier: 0.9
+  - regionName: Rapids
+    startDistance: 20000
+    waterColor1: {r: 0.8, g: 0.9, b: 1, a: 1}
+    waterColor2: {r: 0.6, g: 0.7, b: 0.9, a: 1}
+    bankColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    grassColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+    speedMultiplier: 1.15
