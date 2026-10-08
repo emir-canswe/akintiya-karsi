@@ -10,30 +10,46 @@ namespace Upstream.Mechanics
     public class GrowthSystem : MonoBehaviour
     {
         [SerializeField] private GrowthConfig config;
-        
+
         private int currentStageIndex;
         private int totalFoodEaten;
         private HealthSystem healthSystem;
 
-        /// <summary>
-        /// The current growth stage index.
-        /// </summary>
+        public GrowthConfig Config
+        {
+            get
+            {
+                if (config == null) config = ScriptableObject.CreateInstance<GrowthConfig>();
+                return config;
+            }
+            set => config = value;
+        }
+
         public int CurrentStage => currentStageIndex;
+        public int TotalFoodEaten => totalFoodEaten;
 
-        /// <summary>
-        /// The configuration data for the current growth stage.
-        /// </summary>
-        public GrowthStage CurrentStageData => (config != null && config.stages != null && currentStageIndex < config.stages.Length) ? config.stages[currentStageIndex] : null;
+        public GrowthStage CurrentStageData =>
+            (Config.stages != null && currentStageIndex >= 0 && currentStageIndex < Config.stages.Length)
+                ? Config.stages[currentStageIndex]
+                : null;
 
-        /// <summary>
-        /// Visual size multiplier for the current stage.
-        /// </summary>
         public float SizeMultiplier => CurrentStageData?.sizeMultiplier ?? 1f;
+        public float HitboxMultiplier => CurrentStageData?.hitboxMultiplier ?? 1f;
 
         /// <summary>
-        /// Hitbox scaling multiplier for the current stage.
+        /// Progress (0 to 1) toward the next growth stage. Returns 1 at max stage.
         /// </summary>
-        public float HitboxMultiplier => CurrentStageData?.hitboxMultiplier ?? 1f;
+        public float StageProgress
+        {
+            get
+            {
+                if (Config.stages == null || currentStageIndex >= Config.stages.Length - 1) return 1f;
+                int prevReq = Config.stages[currentStageIndex].foodRequired;
+                int nextReq = Config.stages[currentStageIndex + 1].foodRequired;
+                if (nextReq <= prevReq) return 1f;
+                return Mathf.Clamp01((float)(totalFoodEaten - prevReq) / (nextReq - prevReq));
+            }
+        }
 
         private void Awake()
         {
@@ -52,9 +68,9 @@ namespace Upstream.Mechanics
             GameEvents.OnGameStart -= ResetGrowth;
         }
 
-        private void OnFoodEaten(bool isGold)
+        public void OnFoodEaten(bool isGold)
         {
-            if (isGold) return; // Gold food doesn't contribute to standard growth
+            if (isGold) return;
 
             totalFoodEaten++;
             CheckGrowth();
@@ -62,11 +78,9 @@ namespace Upstream.Mechanics
 
         private void CheckGrowth()
         {
-            if (config == null || config.stages == null) return;
-            if (currentStageIndex >= config.stages.Length - 1) return; // Already at max stage
-
-            int nextStageReq = config.stages[currentStageIndex + 1].foodRequired;
-            if (totalFoodEaten >= nextStageReq)
+            if (Config.stages == null) return;
+            while (currentStageIndex < Config.stages.Length - 1 &&
+                   totalFoodEaten >= Config.stages[currentStageIndex + 1].foodRequired)
             {
                 currentStageIndex++;
                 GameEvents.OnGrowthStageChanged?.Invoke(currentStageIndex);
@@ -78,16 +92,13 @@ namespace Upstream.Mechanics
             }
         }
 
-        /// <summary>
-        /// Determines if a shark can be eaten based on current stage capabilities.
-        /// </summary>
         public bool CanEatShark(bool isLarge, bool hasTurbo)
         {
             if (CurrentStageData == null) return false;
 
             if (isLarge)
             {
-                return CurrentStageData.canEatLargeSharks;
+                return CurrentStageData.canEatLargeSharks && hasTurbo;
             }
             else
             {
@@ -96,13 +107,11 @@ namespace Upstream.Mechanics
             }
         }
 
-        /// <summary>
-        /// Resets growth progress to the beginning.
-        /// </summary>
         public void ResetGrowth()
         {
-            currentStageIndex = 0;
-            totalFoodEaten = 0;
+            var save = SaveSystem.Load();
+            currentStageIndex = Mathf.Clamp(save.unlockedStartStage, 0, Config.stages.Length - 1);
+            totalFoodEaten = Config.stages[currentStageIndex].foodRequired;
             GameEvents.OnGrowthStageChanged?.Invoke(currentStageIndex);
         }
     }

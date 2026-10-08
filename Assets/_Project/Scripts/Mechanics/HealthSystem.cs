@@ -10,39 +10,48 @@ namespace Upstream.Mechanics
     public class HealthSystem : MonoBehaviour
     {
         [SerializeField] private GameConfig config;
-        
-        private int currentHP;
+
+        private int currentHP = 3;
         private float invincibilityTimer;
         private TurboSystem turboSystem;
 
-        /// <summary>
-        /// Current health points.
-        /// </summary>
+        public GameConfig Config
+        {
+            get
+            {
+                if (config == null)
+                {
+                    config = GameManager.Instance != null
+                        ? GameManager.Instance.Config
+                        : ScriptableObject.CreateInstance<GameConfig>();
+                }
+                return config;
+            }
+            set => config = value;
+        }
+
         public int CurrentHP => currentHP;
-
-        /// <summary>
-        /// Whether the player is currently invincible.
-        /// </summary>
         public bool IsInvincible => invincibilityTimer > 0f;
-
-        /// <summary>
-        /// Maximum health points available.
-        /// </summary>
-        public int MaxHP => config.maxHP;
+        public int MaxHP => Config.maxHP;
 
         private void Awake()
         {
             turboSystem = GetComponent<TurboSystem>();
+            currentHP = Config.maxHP;
         }
 
         private void OnEnable()
         {
             GameEvents.OnGameStart += ResetHealth;
+            GameEvents.OnFoodEaten += HandleFoodEaten;
+            GameEvents.OnContinueUsed += HandleContinueUsed;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= ResetHealth;
+            GameEvents.OnFoodEaten -= HandleFoodEaten;
+            GameEvents.OnContinueUsed -= HandleContinueUsed;
         }
 
         private void Update()
@@ -53,54 +62,60 @@ namespace Upstream.Mechanics
             }
         }
 
-        /// <summary>
-        /// Resets health to maximum and clears invincibility.
-        /// </summary>
+        private void HandleFoodEaten(bool isGold)
+        {
+            if (isGold)
+            {
+                Heal(1);
+            }
+        }
+
+        private void HandleContinueUsed()
+        {
+            currentHP = Config.continueHP;
+            SetInvincible(Config.continueInvincibility);
+        }
+
         public void ResetHealth()
         {
-            currentHP = config.maxHP;
+            currentHP = Config.maxHP;
             invincibilityTimer = 0f;
         }
 
-        /// <summary>
-        /// Attempts to apply damage to the player.
-        /// </summary>
-        /// <returns>True if damage was successfully taken, false if invincible or in turbo mode.</returns>
         public bool TakeDamage()
         {
             if (IsInvincible) return false;
             if (turboSystem != null && turboSystem.IsTurboActive) return false;
 
-            currentHP--;
+            currentHP = Mathf.Max(0, currentHP - 1);
             GameEvents.OnPlayerHurt?.Invoke(currentHP);
 
             if (currentHP <= 0)
             {
-                GameEvents.OnPlayerDied?.Invoke();
+                if (GameManager.Instance != null)
+                {
+                    GameManager.Instance.GameOver();
+                }
+                else
+                {
+                    GameEvents.OnPlayerDied?.Invoke();
+                }
             }
             else
             {
-                SetInvincible(config.invincibilityDuration);
+                SetInvincible(Config.invincibilityDuration);
             }
 
             return true;
         }
 
-        /// <summary>
-        /// Restores health by the specified amount, up to the maximum.
-        /// </summary>
-        /// <param name="amount">Amount to heal.</param>
         public void Heal(int amount)
         {
-            if (currentHP >= config.maxHP) return;
-            
-            currentHP = Mathf.Min(currentHP + amount, config.maxHP);
+            if (currentHP >= Config.maxHP) return;
+            currentHP = Mathf.Min(currentHP + amount, Config.maxHP);
+            GameEvents.OnPlayerHurt?.Invoke(currentHP);
         }
 
-        /// <summary>
-        /// Sets the invincibility timer to the given duration if it is longer than the current remaining time.
-        /// </summary>
-        /// <param name="duration">Duration of invincibility in seconds.</param>
         public void SetInvincible(float duration)
         {
             if (duration > invincibilityTimer)

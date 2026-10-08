@@ -17,25 +17,25 @@ namespace Upstream.Mechanics
         private float turboTimer;
         private GrowthSystem growthSystem;
 
-        /// <summary>
-        /// Current power percentage from 0 to 1.
-        /// </summary>
-        public float PowerPercent => Mathf.Clamp01(currentPower / config.maxPower);
+        public GameConfig Config
+        {
+            get
+            {
+                if (config == null)
+                {
+                    config = GameManager.Instance != null
+                        ? GameManager.Instance.Config
+                        : ScriptableObject.CreateInstance<GameConfig>();
+                }
+                return config;
+            }
+            set => config = value;
+        }
 
-        /// <summary>
-        /// Remaining time for active turbo mode.
-        /// </summary>
+        public float PowerPercent => Mathf.Clamp01(currentPower / Config.maxPower);
         public float TurboTimeRemaining => turboTimer;
-
-        /// <summary>
-        /// Whether turbo mode is currently active.
-        /// </summary>
         public bool IsTurboActive => turboTimer > 0f;
-
-        /// <summary>
-        /// Turbo active percentage from 0 to 1 (remaining / total).
-        /// </summary>
-        public float TurboPercent => IsTurboActive ? Mathf.Clamp01(turboTimer / config.turboTime) : 0f;
+        public float TurboPercent => IsTurboActive ? Mathf.Clamp01(turboTimer / Config.turboTime) : 0f;
 
         private void Awake()
         {
@@ -45,11 +45,21 @@ namespace Upstream.Mechanics
         private void OnEnable()
         {
             GameEvents.OnGameStart += ResetTurbo;
+            GameEvents.OnFoodEaten += HandleFoodEaten;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= ResetTurbo;
+            GameEvents.OnFoodEaten -= HandleFoodEaten;
+        }
+
+        private void HandleFoodEaten(bool isGold)
+        {
+            if (!isGold)
+            {
+                AddPower(Config.powerPerFood);
+            }
         }
 
         private void Update()
@@ -61,47 +71,37 @@ namespace Upstream.Mechanics
                 {
                     turboTimer = 0f;
                     GameEvents.OnTurboEnd?.Invoke();
-                    
-                    // Give brief invincibility upon exiting turbo
+
                     if (TryGetComponent<HealthSystem>(out var health))
                     {
-                        health.SetInvincible(1f); 
+                        health.SetInvincible(0.8f);
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Adds power to the turbo bar, scaled by the current growth stage multiplier.
-        /// Activates turbo if it reaches max capacity.
-        /// </summary>
-        /// <param name="amount">Base power amount to add.</param>
         public void AddPower(float amount)
         {
             if (IsTurboActive) return;
 
-            float multiplier = growthSystem.CurrentStageData?.powerBarFillMultiplier ?? 1f;
+            float multiplier = (growthSystem != null && growthSystem.CurrentStageData != null)
+                ? growthSystem.CurrentStageData.powerBarFillMultiplier
+                : 1f;
             currentPower += amount * multiplier;
 
-            if (currentPower >= config.maxPower)
+            if (currentPower >= Config.maxPower)
             {
                 ActivateTurbo();
             }
         }
 
-        /// <summary>
-        /// Manually activates turbo mode, resetting power and starting the timer.
-        /// </summary>
         public void ActivateTurbo()
         {
             currentPower = 0f;
-            turboTimer = config.turboTime;
+            turboTimer = Config.turboTime;
             GameEvents.OnTurboStart?.Invoke();
         }
 
-        /// <summary>
-        /// Resets the turbo state completely.
-        /// </summary>
         public void ResetTurbo()
         {
             currentPower = 0f;

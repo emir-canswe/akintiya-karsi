@@ -1,13 +1,17 @@
 using UnityEngine;
+using Upstream.Camera;
 using Upstream.Core;
+using Upstream.Data;
 using Upstream.Entities;
 using Upstream.Mechanics;
-using Upstream.Data;
+using Upstream.River;
+using Upstream.UI;
 
 namespace Upstream.Spawning
 {
     /// <summary>
     /// Performs non-physics based collision checks for all river entities against the player.
+    /// Triggers the signature Shark Devour ("O AN") sequence when a large enough fish eats a shark.
     /// </summary>
     public class CollisionManager : MonoBehaviour
     {
@@ -17,129 +21,197 @@ namespace Upstream.Spawning
         [SerializeField] private TurboSystem turboSystem;
         [SerializeField] private GrowthSystem growthSystem;
         [SerializeField] private ScoreSystem scoreSystem;
+        [SerializeField] private RiverController riverController;
+        [SerializeField] private GameCamera gameCamera;
+        [SerializeField] private ToastUI toastUI;
         [SerializeField] private GameConfig gameConfig;
         [SerializeField] private GrowthConfig growthConfig;
 
+        public void Configure(
+            SpawnManager spawner,
+            Transform player,
+            HealthSystem health,
+            TurboSystem turbo,
+            GrowthSystem growth,
+            ScoreSystem scorer,
+            RiverController river,
+            GameCamera cam,
+            ToastUI toast,
+            GameConfig gConfig,
+            GrowthConfig grConfig)
+        {
+            spawnManager = spawner;
+            playerTransform = player;
+            healthSystem = health;
+            turboSystem = turbo;
+            growthSystem = growth;
+            scoreSystem = scorer;
+            riverController = river;
+            gameCamera = cam;
+            toastUI = toast;
+            gameConfig = gConfig;
+            growthConfig = grConfig;
+        }
+
         private void Update()
         {
-            // Only check collisions if playing
             if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameState.Playing) return;
             if (playerTransform == null || spawnManager == null) return;
 
             Vector2 playerPos = playerTransform.position;
-            float pRadius = gameConfig != null ? gameConfig.playerRadius : 14f;
+            float baseRadius = gameConfig != null ? gameConfig.playerRadius : 14f;
+            float hitboxMult = growthSystem != null ? growthSystem.HitboxMultiplier : 1f;
+            float pRadius = baseRadius * hitboxMult;
             bool isTurbo = turboSystem != null && turboSystem.IsTurboActive;
 
-            foreach (var entity in spawnManager.ActiveEntities)
+            var entities = spawnManager.ActiveEntities;
+            for (int i = 0; i < entities.Count; i++)
             {
-                if (!entity.isActive) continue;
-                if (entity is SharkEnemy s && s.isDead) continue;
+                var entity = entities[i];
+                if (entity == null || !entity.isActive || entity.isFlying) continue;
 
                 Vector2 ePos = entity.transform.position;
-                
-                // Broadphase Y check - skip far entities
-                if (Mathf.Abs(ePos.y - playerPos.y) > 150f) continue;
+                if (Mathf.Abs(ePos.y - playerPos.y) > 140f) continue;
 
-                bool hit = false;
-                
                 switch (entity.Type)
                 {
                     case EntityType.Food:
-                        hit = Vector2.Distance(playerPos, ePos) < (pRadius + 15f);
-                        if (hit) ((FoodPickup)entity).Collect();
+                        if (Vector2.Distance(playerPos, ePos) < (pRadius + 14f))
+                        {
+                            ((FoodPickup)entity).Collect();
+                        }
                         break;
 
                     case EntityType.GoldFood:
-                        hit = Vector2.Distance(playerPos, ePos) < (pRadius + 15f);
-                        if (hit) ((GoldFoodPickup)entity).Collect();
+                        if (Vector2.Distance(playerPos, ePos) < (pRadius + 16f))
+                        {
+                            ((GoldFoodPickup)entity).Collect();
+                        }
                         break;
 
                     case EntityType.Rock:
                         var rock = (RockObstacle)entity;
-                        hit = Vector2.Distance(playerPos, ePos) < (pRadius + rock.radius);
-                        if (hit)
+                        if (Vector2.Distance(playerPos, ePos) < (pRadius + rock.radius - 4f))
                         {
-                            if (isTurbo) 
+                            if (isTurbo)
                             {
-                                rock.Smash();
+                                rock.Smash(playerPos.x);
                             }
-                            else 
+                            else if (rock.isSmall && growthSystem != null &&
+                                     growthSystem.CurrentStageData != null &&
+                                     growthSystem.CurrentStageData.smallRockImmune)
                             {
-                                // If small rock and player immune, we could implement slow down here.
-                                // For now, taking damage unless immune logic is handled inside HealthSystem.
-                                healthSystem.TakeDamage(); 
-                                rock.Smash(); 
+                                rock.Smash(playerPos.x);
+                                riverController?.ApplySlowdown(0.55f);
+                                gameCamera?.Shake(3.5f);
+                            }
+                            else
+                            {
+                                if (healthSystem != null && healthSystem.TakeDamage())
+                                {
+                                    gameCamera?.Shake(9f);
+                                }
+                                rock.Smash(playerPos.x);
                             }
                         }
                         break;
 
                     case EntityType.Shark:
                         var sh = (SharkEnemy)entity;
-                        // Check against 3 body circles
-                        float[] offsets = { -14f, 6f, 24f };
-                        foreach(var off in offsets) 
+                        float sharkScale = sh.isLarge ? 1.4f : 1f;
+                        bool sharkHit = false;
+                        float[] offsets = { -16f * sharkScale, 4f * sharkScale, 24f * sharkScale };
+                        for (int k = 0; k < offsets.Length; k++)
                         {
-                            // Adjusting offset direction assuming shark is pointing somewhat downwards
-                            // Using local Up based on rotation
-                            Vector3 partPos = ePos + sh.transform.up * off;
-                            if (Vector2.Distance(playerPos, partPos) < (pRadius + 15f)) 
-                            { 
-                                hit = true; 
-                                break; 
+                            Vector2 partPos = ePos + new Vector2(0f, offsets[k]);
+                            if (Vector2.Distance(playerPos, partPos) < (pRadius + 16f * sharkScale))
+                            {
+                                sharkHit = true;
+                                break;
                             }
                         }
-                        
-                        if (hit)
+
+                        if (sharkHit)
                         {
-                            if (isTurbo || (growthSystem != null && growthSystem.CanEatShark(sh.isLarge, isTurbo)))
+                            bool canEat = growthSystem != null && growthSystem.CanEatShark(sh.isLarge, isTurbo);
+                            if (canEat)
                             {
-                                sh.Smash();
+                                // SIGNATURE MOMENT: Devouring a shark!
+                                sh.Smash(playerPos.x);
                                 GameEvents.OnSharkEaten?.Invoke();
-                                if (scoreSystem != null && growthConfig != null)
-                                {
-                                    scoreSystem.AddBonus(growthConfig.sharkEatBonusDistance);
-                                }
-                                else if (scoreSystem != null)
-                                {
-                                    scoreSystem.AddBonus(50f);
-                                }
+
+                                float bonus = growthConfig != null ? growthConfig.sharkEatBonusDistance : 500f;
+                                scoreSystem?.AddBonus(bonus);
+
+                                float btScale = growthConfig != null ? growthConfig.bulletTimeScale : 0.3f;
+                                float btDur = growthConfig != null ? growthConfig.bulletTimeDuration : 0.32f;
+                                float zoomAmt = growthConfig != null ? growthConfig.zoomInAmount : 0.2f;
+
+                                gameCamera?.BulletTime(btScale, btDur);
+                                gameCamera?.ZoomIn(zoomAmt, 0.22f);
+                                gameCamera?.Shake(12f);
+                                toastUI?.Show("+50m YUTTUN!", new Color(1f, 0.54f, 0.36f));
+                            }
+                            else if (isTurbo)
+                            {
+                                sh.Smash(playerPos.x);
+                                gameCamera?.Shake(6f);
                             }
                             else
                             {
-                                healthSystem.TakeDamage();
-                                sh.Smash();
+                                if (healthSystem != null && healthSystem.TakeDamage())
+                                {
+                                    gameCamera?.Shake(10f);
+                                }
+                                sh.Smash(playerPos.x);
                             }
                         }
                         break;
 
                     case EntityType.Log:
                         var log = (LogObstacle)entity;
-                        // AABB closest point to circle center check
-                        float minX = ePos.x - log.width / 2f;
-                        float maxX = ePos.x + log.width / 2f;
-                        float minY = ePos.y - log.height / 2f;
-                        float maxY = ePos.y + log.height / 2f;
-                        
+                        float minX = ePos.x - log.width * 0.5f;
+                        float maxX = ePos.x + log.width * 0.5f;
+                        float minY = ePos.y - log.height * 0.5f;
+                        float maxY = ePos.y + log.height * 0.5f;
+
                         float closestX = Mathf.Clamp(playerPos.x, minX, maxX);
                         float closestY = Mathf.Clamp(playerPos.y, minY, maxY);
-                        
-                        hit = Vector2.Distance(playerPos, new Vector2(closestX, closestY)) < pRadius;
-                        if (hit)
+
+                        if (Vector2.Distance(playerPos, new Vector2(closestX, closestY)) < (pRadius - 2f))
                         {
-                            if (isTurbo) log.Smash();
-                            else { healthSystem.TakeDamage(); log.Smash(); }
+                            if (isTurbo)
+                            {
+                                log.Smash(playerPos.x);
+                            }
+                            else
+                            {
+                                if (healthSystem != null && healthSystem.TakeDamage())
+                                {
+                                    gameCamera?.Shake(9f);
+                                }
+                                log.Smash(playerPos.x);
+                            }
                         }
                         break;
 
                     case EntityType.Hook:
                         var hook = (HookTrap)entity;
-                        // Collision point sways with the hook
                         Vector2 hookPos = new Vector2(hook.CurrentX, ePos.y);
-                        hit = Vector2.Distance(playerPos, hookPos) < (pRadius + 10f);
-                        if (hit)
+                        if (Vector2.Distance(playerPos, hookPos) < (pRadius + 9f))
                         {
-                            if (isTurbo) hook.Smash();
-                            else { healthSystem.TakeDamage(); hook.Smash(); }
+                            if (isTurbo)
+                            {
+                                hook.Smash(playerPos.x);
+                            }
+                            else
+                            {
+                                if (healthSystem != null && healthSystem.TakeDamage())
+                                {
+                                    gameCamera?.Shake(9f);
+                                }
+                                hook.Smash(playerPos.x);
+                            }
                         }
                         break;
                 }

@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
@@ -20,13 +19,49 @@ namespace Upstream.UI
         [SerializeField] private Button continueButton;
         [SerializeField] private TMP_Text continueNoteText;
         [SerializeField] private CanvasGroup canvasGroup;
+        [SerializeField] private ScoreSystem scoreSystem;
 
         private bool hasContinued;
 
+        public void Configure(
+            TMP_Text score,
+            TMP_Text best,
+            GameObject badge,
+            Button againBtn,
+            Button contBtn,
+            TMP_Text contNote,
+            CanvasGroup group,
+            ScoreSystem scorer)
+        {
+            scoreText = score;
+            bestScoreText = best;
+            newBestBadge = badge;
+            playAgainButton = againBtn;
+            continueButton = contBtn;
+            continueNoteText = contNote;
+            canvasGroup = group;
+            scoreSystem = scorer;
+            BindButtons();
+        }
+
         private void Awake()
         {
-            playAgainButton.onClick.AddListener(OnPlayAgainClicked);
-            continueButton.onClick.AddListener(OnContinueClicked);
+            if (scoreSystem == null) scoreSystem = FindFirstObjectByType<ScoreSystem>();
+            BindButtons();
+        }
+
+        private void BindButtons()
+        {
+            if (playAgainButton != null)
+            {
+                playAgainButton.onClick.RemoveListener(OnPlayAgainClicked);
+                playAgainButton.onClick.AddListener(OnPlayAgainClicked);
+            }
+            if (continueButton != null)
+            {
+                continueButton.onClick.RemoveListener(OnContinueClicked);
+                continueButton.onClick.AddListener(OnContinueClicked);
+            }
         }
 
         private void OnEnable()
@@ -43,30 +78,36 @@ namespace Upstream.UI
             GameEvents.OnContinueUsed -= HandleContinueUsed;
         }
 
+        public void ShowGameOver()
+        {
+            HandleGameOver();
+        }
+
         private void HandleGameOver()
         {
             gameObject.SetActive(true);
-            StartCoroutine(FadeIn(0.3f));
+            if (canvasGroup != null) StartCoroutine(FadeIn(0.28f));
 
-            int currentScore = ScoreSystem.DisplayScore;
-            scoreText.text = $"{currentScore}m";
+            if (scoreSystem == null) scoreSystem = FindFirstObjectByType<ScoreSystem>();
+            int currentScore = scoreSystem != null
+                ? scoreSystem.DisplayScore
+                : (GameManager.Instance != null ? Mathf.FloorToInt(GameManager.Instance.CurrentDistance / 10f) : 0);
+
+            if (scoreText != null) scoreText.text = $"{currentScore}<size=45%>m</size>";
 
             var saveData = SaveSystem.Load();
-            if (currentScore > saveData.BestScore)
+            bool isNewBest = currentScore > saveData.bestScore && currentScore > 0;
+            if (isNewBest)
             {
-                saveData.BestScore = currentScore;
+                saveData.bestScore = currentScore;
                 SaveSystem.Save(saveData);
-                if (newBestBadge != null) newBestBadge.SetActive(true);
             }
-            else
-            {
-                if (newBestBadge != null) newBestBadge.SetActive(false);
-            }
+            if (newBestBadge != null) newBestBadge.SetActive(isNewBest);
 
-            bestScoreText.text = $"BEST: {saveData.BestScore}m";
+            if (bestScoreText != null) bestScoreText.text = $"En iyi: {saveData.bestScore} m";
 
-            bool canContinue = !hasContinued && currentScore >= 30;
-            continueButton.gameObject.SetActive(canContinue);
+            bool canContinue = !hasContinued && currentScore >= 15;
+            if (continueButton != null) continueButton.gameObject.SetActive(canContinue);
             if (continueNoteText != null) continueNoteText.gameObject.SetActive(canContinue);
         }
 
@@ -76,7 +117,7 @@ namespace Upstream.UI
             canvasGroup.alpha = 0f;
             while (elapsed < duration)
             {
-                elapsed += Time.deltaTime;
+                elapsed += Time.unscaledDeltaTime;
                 canvasGroup.alpha = Mathf.Clamp01(elapsed / duration);
                 yield return null;
             }
@@ -85,12 +126,12 @@ namespace Upstream.UI
 
         private void OnPlayAgainClicked()
         {
-            GameManager.Instance.StartGame();
+            if (GameManager.Instance != null) GameManager.Instance.StartGame();
         }
 
         private void OnContinueClicked()
         {
-            GameManager.Instance.ContinueWithAd();
+            if (GameManager.Instance != null) GameManager.Instance.ContinueWithAd();
         }
 
         private void HandleGameStart()

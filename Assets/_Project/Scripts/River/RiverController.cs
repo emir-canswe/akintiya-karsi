@@ -2,7 +2,6 @@ using UnityEngine;
 using Upstream.Core;
 using Upstream.Data;
 using Upstream.Mechanics;
-using System.Reflection;
 
 namespace Upstream.River
 {
@@ -17,23 +16,46 @@ namespace Upstream.River
         [SerializeField] private ScoreSystem scoreSystem;
 
         private float scrollOffset;
-        private float currentBaseSpeed;
+        private float currentBaseSpeed = 150f;
+        private float slowdownTimer;
         private bool isTurbo;
 
-        /// <summary>
-        /// The active flow speed factoring in state, turbo, and regions.
-        /// </summary>
-        public float FlowSpeed => GetFlowSpeed();
+        public GameConfig Config
+        {
+            get
+            {
+                if (config == null)
+                {
+                    config = GameManager.Instance != null
+                        ? GameManager.Instance.Config
+                        : ScriptableObject.CreateInstance<GameConfig>();
+                }
+                return config;
+            }
+            set => config = value;
+        }
 
-        /// <summary>
-        /// The accumulated scroll offset.
-        /// </summary>
+        public DifficultyConfig DiffConfig
+        {
+            get
+            {
+                if (diffConfig == null) diffConfig = ScriptableObject.CreateInstance<DifficultyConfig>();
+                return diffConfig;
+            }
+            set => diffConfig = value;
+        }
+
+        public float FlowSpeed => GetFlowSpeed();
         public float ScrollOffset => scrollOffset;
+        public RegionData ActiveRegion => scaler != null && GameManager.Instance != null
+            ? scaler.GetCurrentRegion(GameManager.Instance.CurrentDistance)
+            : (DiffConfig.regions != null && DiffConfig.regions.Length > 0 ? DiffConfig.regions[0] : null);
 
         private void Awake()
         {
-            if (scaler == null) scaler = FindObjectOfType<DifficultyScaler>();
-            if (scoreSystem == null) scoreSystem = FindObjectOfType<ScoreSystem>();
+            if (scaler == null) scaler = FindFirstObjectByType<DifficultyScaler>();
+            if (scoreSystem == null) scoreSystem = FindFirstObjectByType<ScoreSystem>();
+            currentBaseSpeed = Config.startSpeed;
         }
 
         private void OnEnable()
@@ -53,61 +75,69 @@ namespace Upstream.River
         private void OnTurboStart() => isTurbo = true;
         private void OnTurboEnd() => isTurbo = false;
 
+        public void ApplySlowdown(float duration = 0.6f)
+        {
+            slowdownTimer = Mathf.Max(slowdownTimer, duration);
+        }
+
         private void Update()
         {
             if (GameManager.Instance == null) return;
 
+            if (slowdownTimer > 0f) slowdownTimer -= Time.deltaTime;
+
             GameState state = GameManager.Instance.CurrentState;
             if (state == GameState.Playing)
             {
-                currentBaseSpeed = scaler.GetCurrentSpeed(currentBaseSpeed, config.maxSpeed, config.speedIncrease, Time.deltaTime);
+                if (scaler != null)
+                {
+                    currentBaseSpeed = scaler.GetCurrentSpeed(currentBaseSpeed, Config.maxSpeed, Config.speedIncrease, Time.deltaTime);
+                }
+                else
+                {
+                    currentBaseSpeed = Mathf.Min(Config.maxSpeed, currentBaseSpeed + Config.speedIncrease * Time.deltaTime);
+                }
             }
 
             float flow = GetFlowSpeed();
             scrollOffset += flow * Time.deltaTime;
 
-            if (state == GameState.Playing && scoreSystem != null)
+            if (state == GameState.Playing)
             {
-                scoreSystem.AddDistance(flow * Time.deltaTime);
+                float deltaDist = flow * Time.deltaTime;
+                GameManager.Instance.CurrentDistance += deltaDist;
+                if (scoreSystem != null)
+                {
+                    scoreSystem.AddDistance(deltaDist);
+                }
             }
         }
 
-        /// <summary>
-        /// Evaluates and returns the active flow speed based on current game states and conditions.
-        /// </summary>
         public float GetFlowSpeed()
         {
-            if (GameManager.Instance == null) return 0f;
+            if (GameManager.Instance == null) return 70f;
 
             GameState state = GameManager.Instance.CurrentState;
-            
+
             if (state == GameState.Menu) return 70f;
             if (state == GameState.Dying) return currentBaseSpeed * 0.3f;
             if (state == GameState.GameOver || state == GameState.Paused) return 0f;
 
-            // Playing state
             float speed = currentBaseSpeed;
-            if (isTurbo) speed *= config.turboSpeedMultiplier;
+            if (isTurbo) speed *= Config.turboSpeedMultiplier;
+            if (slowdownTimer > 0f) speed *= 0.68f;
 
-            RegionData region = scaler.GetCurrentRegion(GameManager.Instance.CurrentDistance);
-            float regionMultiplier = 1f;
-            
-            if (region != null)
-            {
-                FieldInfo field = region.GetType().GetField("speedMultiplier");
-                if (field != null) regionMultiplier = (float)field.GetValue(region);
-            }
+            RegionData region = ActiveRegion;
+            float regionMultiplier = region != null && region.speedMultiplier > 0f ? region.speedMultiplier : 1f;
 
             return speed * regionMultiplier;
         }
 
-        /// <summary>
-        /// Resets river properties for a new run.
-        /// </summary>
         public void ResetRiver()
         {
             scrollOffset = 0f;
-            currentBaseSpeed = config.startSpeed;
+            currentBaseSpeed = Config.startSpeed;
+            slowdownTimer = 0f;
             isTurbo = false;
         }
     }

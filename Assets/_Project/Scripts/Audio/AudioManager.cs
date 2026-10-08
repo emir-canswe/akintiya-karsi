@@ -28,7 +28,41 @@ namespace Upstream.Audio
         [SerializeField] private AudioClip ambientWater;
 
         private AudioSource turboSource;
+        private TurboSystem turboSystem;
         private bool isMuted;
+
+        public bool IsMuted => isMuted;
+
+        public void SetClips(
+            AudioClip eat,
+            AudioClip eatGold,
+            AudioClip tStart,
+            AudioClip tLoop,
+            AudioClip hurtClip,
+            AudioClip dieClip,
+            AudioClip sharkClip,
+            AudioClip stageClip,
+            AudioClip clickClip,
+            AudioClip ambientClip)
+        {
+            eatFood = eat;
+            eatGoldFood = eatGold;
+            turboStart = tStart;
+            turboLoop = tLoop;
+            hurt = hurtClip;
+            die = dieClip;
+            sharkEat = sharkClip;
+            stageUp = stageClip;
+            buttonClick = clickClip;
+            ambientWater = ambientClip;
+
+            if (ambientSource != null && ambientWater != null && !ambientSource.isPlaying)
+            {
+                ambientSource.clip = ambientWater;
+                ambientSource.volume = 0.22f;
+                ambientSource.Play();
+            }
+        }
 
         private void Awake()
         {
@@ -36,21 +70,22 @@ namespace Upstream.Audio
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
-                
-                // Initialize default setup if not assigned
+
                 if (sfxSources == null || sfxSources.Length == 0)
                 {
-                    sfxSources = new AudioSource[4];
+                    sfxSources = new AudioSource[6];
                     for (int i = 0; i < sfxSources.Length; i++)
                     {
                         sfxSources[i] = gameObject.AddComponent<AudioSource>();
+                        sfxSources[i].playOnAwake = false;
                     }
                 }
-                
+
                 if (ambientSource == null)
                 {
                     ambientSource = gameObject.AddComponent<AudioSource>();
                     ambientSource.loop = true;
+                    ambientSource.playOnAwake = false;
                 }
             }
             else
@@ -62,11 +97,12 @@ namespace Upstream.Audio
         private void Start()
         {
             var saveData = SaveSystem.Load();
-            SetMuted(saveData.IsMuted);
+            SetMuted(!saveData.settingsSoundOn);
 
-            if (ambientWater != null)
+            if (ambientWater != null && !ambientSource.isPlaying)
             {
                 ambientSource.clip = ambientWater;
+                ambientSource.volume = 0.22f;
                 ambientSource.Play();
             }
         }
@@ -93,46 +129,43 @@ namespace Upstream.Audio
             GameEvents.OnGrowthStageChanged -= HandleGrowthStageChanged;
         }
 
-        public void PlaySFX(AudioClip clip)
+        public void PlaySFX(AudioClip clip, float pitch = 1f)
         {
-            if (isMuted || clip == null) return;
+            if (isMuted || clip == null || sfxSources == null) return;
 
             foreach (var source in sfxSources)
             {
                 if (!source.isPlaying)
                 {
-                    source.pitch = 1f;
+                    source.pitch = pitch;
                     source.PlayOneShot(clip);
                     return;
                 }
             }
 
-            // Fallback: use first source if all busy
             if (sfxSources.Length > 0)
             {
-                sfxSources[0].pitch = 1f;
+                sfxSources[0].pitch = pitch;
                 sfxSources[0].PlayOneShot(clip);
             }
         }
 
         public void PlaySFXPitchVaried(AudioClip clip, float minPitch, float maxPitch)
         {
-            if (isMuted || clip == null) return;
-
-            foreach (var source in sfxSources)
-            {
-                if (!source.isPlaying)
-                {
-                    source.pitch = Random.Range(minPitch, maxPitch);
-                    source.PlayOneShot(clip);
-                    return;
-                }
-            }
+            PlaySFX(clip, Random.Range(minPitch, maxPitch));
         }
 
         public void StopAmbient()
         {
-            ambientSource.Stop();
+            if (ambientSource != null) ambientSource.Stop();
+        }
+
+        public void ToggleMute()
+        {
+            SetMuted(!isMuted);
+            var saveData = SaveSystem.Load();
+            saveData.settingsSoundOn = !isMuted;
+            SaveSystem.Save(saveData);
         }
 
         public void SetMuted(bool muted)
@@ -143,8 +176,8 @@ namespace Upstream.Audio
 
         public void Vibrate(int milliseconds)
         {
-            if (isMuted) return; // Usually you might want a separate setting for vibration, but tying it to mute for now.
-            
+            if (isMuted) return;
+
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
@@ -155,13 +188,10 @@ namespace Upstream.Audio
                     vibrator.Call("vibrate", (long)milliseconds);
                 }
             }
-            catch (System.Exception e)
+            catch (System.Exception)
             {
-                Debug.LogWarning("Vibration failed: " + e.Message);
                 Handheld.Vibrate();
             }
-#else
-            Handheld.Vibrate();
 #endif
         }
 
@@ -169,34 +199,37 @@ namespace Upstream.Audio
         {
             if (isGold)
             {
-                PlaySFX(eatGoldFood);
+                PlaySFX(eatGoldFood, 1f);
             }
             else
             {
-                // Slight pitch increase based on power level
-                float pitch = 1f + (TurboSystem.PowerPercent * 0.5f);
-                PlaySFXPitchVaried(eatFood, pitch - 0.05f, pitch + 0.05f);
+                if (turboSystem == null) turboSystem = FindFirstObjectByType<TurboSystem>();
+                float powerPct = turboSystem != null ? turboSystem.PowerPercent : 0f;
+                float pitch = 0.95f + (powerPct * 0.55f);
+                PlaySFXPitchVaried(eatFood, pitch - 0.03f, pitch + 0.03f);
             }
         }
 
         private void HandleTurboStart()
         {
-            PlaySFX(turboStart);
-            
-            if (isMuted) return;
+            PlaySFX(turboStart, 1f);
 
-            foreach (var source in sfxSources)
+            if (!isMuted && turboLoop != null && sfxSources != null)
             {
-                if (!source.isPlaying)
+                foreach (var source in sfxSources)
                 {
-                    turboSource = source;
-                    turboSource.clip = turboLoop;
-                    turboSource.loop = true;
-                    turboSource.Play();
-                    break;
+                    if (!source.isPlaying)
+                    {
+                        turboSource = source;
+                        turboSource.clip = turboLoop;
+                        turboSource.loop = true;
+                        turboSource.pitch = 1f;
+                        turboSource.Play();
+                        break;
+                    }
                 }
             }
-            Vibrate(50);
+            Vibrate(45);
         }
 
         private void HandleTurboEnd()
@@ -211,25 +244,30 @@ namespace Upstream.Audio
 
         private void HandlePlayerHurt(int currentHp)
         {
-            PlaySFX(hurt);
-            Vibrate(100);
+            PlaySFX(hurt, 1f);
+            Vibrate(80);
         }
 
         private void HandlePlayerDied()
         {
-            PlaySFX(die);
-            Vibrate(200);
+            HandleTurboEnd();
+            PlaySFX(die, 1f);
+            Vibrate(150);
         }
 
         private void HandleSharkEaten()
         {
-            PlaySFX(sharkEat); // Deep bass hit
-            Vibrate(100);
+            PlaySFX(sharkEat, 1f);
+            Vibrate(90);
         }
 
         private void HandleGrowthStageChanged(int stage)
         {
-            PlaySFX(stageUp);
+            if (stage > 0)
+            {
+                PlaySFX(stageUp, 1f + stage * 0.06f);
+                Vibrate(60);
+            }
         }
     }
 }

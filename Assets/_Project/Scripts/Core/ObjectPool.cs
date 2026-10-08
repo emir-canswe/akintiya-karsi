@@ -4,22 +4,29 @@ using UnityEngine;
 namespace Upstream.Core
 {
     /// <summary>
-    /// A generic object pool for Unity Components.
+    /// A generic object pool for Unity Components with zero runtime GC allocation during gameplay.
     /// </summary>
     public class ObjectPool<T> : MonoBehaviour where T : Component
     {
         [SerializeField] private T prefab;
-        [SerializeField] private int initialSize = 10;
+        [SerializeField] private int initialSize = 12;
         [SerializeField] private Transform parent;
 
-        private Queue<T> pool = new Queue<T>();
+        private readonly Queue<T> pool = new Queue<T>();
 
-        /// <summary>
-        /// Initializes the pool with the initial size.
-        /// </summary>
+        public void Configure(T prefabTemplate, int size = 12, Transform poolParent = null)
+        {
+            prefab = prefabTemplate;
+            initialSize = size;
+            parent = poolParent != null ? poolParent : transform;
+            Initialize();
+        }
+
         public void Initialize()
         {
-            for (int i = 0; i < initialSize; i++)
+            if (prefab == null) return;
+            if (parent == null) parent = transform;
+            for (int i = pool.Count; i < initialSize; i++)
             {
                 CreateNewObject();
             }
@@ -33,9 +40,6 @@ namespace Upstream.Core
             return obj;
         }
 
-        /// <summary>
-        /// Gets an object from the pool, activating it.
-        /// </summary>
         public T Get()
         {
             if (pool.Count == 0)
@@ -48,37 +52,23 @@ namespace Upstream.Core
             return obj;
         }
 
-        /// <summary>
-        /// Returns an object to the pool, deactivating it.
-        /// </summary>
         public void Return(T obj)
         {
+            if (obj == null) return;
             obj.gameObject.SetActive(false);
             pool.Enqueue(obj);
         }
     }
 
-    /// <summary>
-    /// Manager for holding references to named object pools.
-    /// </summary>
     public class ObjectPoolManager : MonoBehaviour
     {
-        private Dictionary<string, object> pools = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> pools = new Dictionary<string, object>();
 
-        /// <summary>
-        /// Registers a pool with a specific name.
-        /// </summary>
         public void RegisterPool<T>(string name, ObjectPool<T> pool) where T : Component
         {
-            if (!pools.ContainsKey(name))
-            {
-                pools.Add(name, pool);
-            }
+            pools[name] = pool;
         }
 
-        /// <summary>
-        /// Gets a registered pool by name.
-        /// </summary>
         public ObjectPool<T> GetPool<T>(string name) where T : Component
         {
             if (pools.TryGetValue(name, out object pool))

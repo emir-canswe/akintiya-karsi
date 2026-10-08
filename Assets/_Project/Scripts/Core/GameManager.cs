@@ -8,11 +8,21 @@ namespace Upstream.Core
     {
         public static GameManager Instance { get; private set; }
 
-        public GameState CurrentState { get; private set; }
+        public GameState CurrentState { get; private set; } = GameState.Menu;
 
         [SerializeField] private GameConfig gameConfig;
 
-        public float CurrentDistance { get; private set; }
+        public GameConfig Config
+        {
+            get
+            {
+                if (gameConfig == null) gameConfig = ScriptableObject.CreateInstance<GameConfig>();
+                return gameConfig;
+            }
+            set => gameConfig = value;
+        }
+
+        public float CurrentDistance { get; set; }
         private SaveData saveData;
 
         private void Awake()
@@ -22,26 +32,21 @@ namespace Upstream.Core
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
                 saveData = SaveSystem.Load();
+                if (gameConfig == null) gameConfig = ScriptableObject.CreateInstance<GameConfig>();
             }
-            else
+            else if (Instance != this)
             {
                 Destroy(gameObject);
             }
         }
 
-        private void Update()
-        {
-            if (CurrentState == GameState.Playing && gameConfig != null)
-            {
-                CurrentDistance += Time.deltaTime * gameConfig.startSpeed; // Basic calculation
-                GameEvents.OnScoreChanged?.Invoke(CurrentDistance / gameConfig.distanceToMetersDivisor);
-            }
-        }
-
         public void StartGame()
         {
+            StopAllCoroutines();
+            Time.timeScale = 1f;
             CurrentDistance = 0f;
             CurrentState = GameState.Playing;
+            if (saveData == null) saveData = SaveSystem.Load();
             saveData.totalGamesPlayed++;
             SaveSystem.Save(saveData);
             GameEvents.OnGameStart?.Invoke();
@@ -79,22 +84,20 @@ namespace Upstream.Core
         {
             CurrentState = GameState.Dying;
             GameEvents.OnPlayerDied?.Invoke();
-            
-            float animDuration = gameConfig != null ? gameConfig.deathAnimDuration : 1f;
-            yield return new WaitForSeconds(animDuration);
-            
+
+            float animDuration = Config.deathAnimDuration;
+            yield return new WaitForSecondsRealtime(animDuration);
+
             CurrentState = GameState.GameOver;
-            
-            if (gameConfig != null)
+
+            int score = Mathf.FloorToInt(CurrentDistance / Config.distanceToMetersDivisor);
+            if (saveData == null) saveData = SaveSystem.Load();
+            if (score > saveData.bestScore)
             {
-                int score = Mathf.FloorToInt(CurrentDistance / gameConfig.distanceToMetersDivisor);
-                if (score > saveData.bestScore)
-                {
-                    saveData.bestScore = score;
-                    SaveSystem.Save(saveData);
-                }
+                saveData.bestScore = score;
+                SaveSystem.Save(saveData);
             }
-            
+
             GameEvents.OnGameOver?.Invoke();
         }
 
@@ -102,10 +105,12 @@ namespace Upstream.Core
         {
             if (CurrentState == GameState.GameOver || CurrentState == GameState.Dying)
             {
-                int hp = gameConfig != null ? gameConfig.continueHP : 2;
-                GameEvents.OnPlayerHurt?.Invoke(hp);
-                GameEvents.OnContinueUsed?.Invoke();
+                StopAllCoroutines();
+                Time.timeScale = 1f;
+                int hp = Config.continueHP;
                 CurrentState = GameState.Playing;
+                GameEvents.OnContinueUsed?.Invoke();
+                GameEvents.OnPlayerHurt?.Invoke(hp);
             }
         }
     }

@@ -17,6 +17,33 @@ namespace Upstream.UI
         [SerializeField] private GameObject powerBarContainer;
         [SerializeField] private GameObject turboGlowEffect;
         [SerializeField] private ToastUI toastUI;
+        [SerializeField] private TurboSystem turboSystem;
+
+        public void Configure(
+            TMP_Text distText,
+            Image[] hearts,
+            Image powerFill,
+            GameObject powerContainer,
+            GameObject turboGlow,
+            ToastUI toast,
+            TurboSystem turbo)
+        {
+            distanceText = distText;
+            heartIcons = hearts;
+            powerBarFill = powerFill;
+            powerBarContainer = powerContainer;
+            turboGlowEffect = turboGlow;
+            toastUI = toast;
+            turboSystem = turbo;
+        }
+
+        private void Awake()
+        {
+            if (turboSystem == null)
+            {
+                turboSystem = FindFirstObjectByType<TurboSystem>();
+            }
+        }
 
         private void OnEnable()
         {
@@ -46,13 +73,20 @@ namespace Upstream.UI
         {
             if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Playing)
             {
-                powerBarFill.fillAmount = TurboSystem.IsTurboActive ? TurboSystem.TurboPercent : TurboSystem.PowerPercent;
+                if (turboSystem == null) turboSystem = FindFirstObjectByType<TurboSystem>();
+                if (powerBarFill != null && turboSystem != null)
+                {
+                    powerBarFill.fillAmount = turboSystem.IsTurboActive ? turboSystem.TurboPercent : turboSystem.PowerPercent;
+                }
             }
         }
 
-        private void HandleScoreChanged(float rawDistance)
+        private void HandleScoreChanged(float metersScore)
         {
-            distanceText.text = $"{Mathf.FloorToInt(rawDistance / 10f)}m";
+            if (distanceText != null)
+            {
+                distanceText.text = $"{Mathf.FloorToInt(metersScore)}<size=50%>m</size>";
+            }
         }
 
         private void HandlePlayerHurt(int currentHp)
@@ -60,18 +94,24 @@ namespace Upstream.UI
             UpdateHearts(currentHp);
         }
 
-        private void UpdateHearts(int hp)
+        public void UpdateHearts(int hp)
         {
+            if (heartIcons == null) return;
             for (int i = 0; i < heartIcons.Length; i++)
             {
-                heartIcons[i].color = i < hp ? Color.white : new Color(1f, 1f, 1f, 0.3f);
+                if (heartIcons[i] != null)
+                {
+                    heartIcons[i].color = i < hp
+                        ? new Color(1f, 0.36f, 0.42f, 1f)
+                        : new Color(0f, 0.12f, 0.18f, 0.45f);
+                }
             }
         }
 
         private void HandleTurboStart()
         {
             if (turboGlowEffect != null) turboGlowEffect.SetActive(true);
-            if (toastUI != null) toastUI.Show("TURBO!", Color.yellow);
+            if (toastUI != null) toastUI.Show("TURBO!", new Color(0.49f, 0.94f, 0.78f));
         }
 
         private void HandleTurboEnd()
@@ -81,15 +121,19 @@ namespace Upstream.UI
 
         private void HandleGrowthStageChanged(int stage)
         {
-            if (toastUI != null) toastUI.Show("STAGE UP!", Color.green);
+            if (stage > 0 && toastUI != null)
+            {
+                string[] names = { "YAVRU", "GENÇ!", "YETİŞKİN!", "ALFA!", "DEV BALIK!" };
+                string label = stage < names.Length ? names[stage] : $"KADEME {stage + 1}!";
+                toastUI.Show(label, new Color(1f, 0.84f, 0.35f));
+            }
         }
 
         private void HandleFoodEaten(bool isGold)
         {
-            // Small power bar pulse animation could be added here
             if (isGold && toastUI != null)
             {
-                toastUI.Show("+1 LIFE", Color.red);
+                toastUI.Show("+1 CAN", new Color(1f, 0.84f, 0.35f));
             }
         }
 
@@ -98,8 +142,8 @@ namespace Upstream.UI
             gameObject.SetActive(true);
             if (turboGlowEffect != null) turboGlowEffect.SetActive(false);
             UpdateHearts(3);
-            powerBarFill.fillAmount = 0;
-            distanceText.text = "0m";
+            if (powerBarFill != null) powerBarFill.fillAmount = 0f;
+            if (distanceText != null) distanceText.text = "0<size=50%>m</size>";
         }
 
         private void HandleGameOver()
