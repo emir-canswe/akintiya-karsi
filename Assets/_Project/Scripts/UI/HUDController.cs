@@ -102,7 +102,7 @@ namespace Upstream.UI
             {
                 // Quick bounce: unscaled so it isn't stretched by the shark-eat slow motion.
                 coinPopTime = Mathf.Min(1f, coinPopTime + Time.unscaledDeltaTime * 5f);
-                float s = 1f + Mathf.Sin(coinPopTime * Mathf.PI) * 0.18f;
+                float s = 1f + Mathf.Sin(coinPopTime * Mathf.PI) * 0.08f; // small: must not touch the power bar
                 coinPill.localScale = new Vector3(s, s, 1f);
             }
 

@@ -390,22 +390,26 @@ namespace Upstream.Core
 
             hud.Configure(distText, heartImages, powerFillImg, powerBgObj, null, toastUI, turboSystem);
 
-            // Coins picked up this run: a pill under the hearts, styled like the menu's coin balance
-            GameObject hudCoinPill = CreateUIRect("CoinPill", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(57f, -61f), new Vector2(94f, 32f));
+            // Coins picked up this run: a small frosted pill under the hearts. Kept narrow (x 10..74) so it never
+            // reaches the power bar, which starts around x = 79 on narrow phones (canvas ~326 wide).
+            GameObject hudCoinPill = CreateUIRect("CoinPill", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -60f), new Vector2(64f, 26f));
             Image hudCoinBg = hudCoinPill.AddComponent<Image>();
             hudCoinBg.sprite = WatercolorSpriteFactory.GetRoundedRectSprite();
             hudCoinBg.type = Image.Type.Sliced;
-            hudCoinBg.color = new Color(0.05f, 0.12f, 0.40f, 0.6f);
+            hudCoinBg.color = new Color(1f, 1f, 1f, 0.22f);
             hudCoinBg.raycastTarget = false;
-            GameObject hudCoinObj = CreateUIRect("CoinIcon", hudCoinPill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(24f, 24f));
+            var hudCoinEdge = hudCoinPill.AddComponent<Outline>();
+            hudCoinEdge.effectColor = new Color(1f, 1f, 1f, 0.35f);
+            hudCoinEdge.effectDistance = new Vector2(1.5f, -1.5f);
+            GameObject hudCoinObj = CreateUIRect("CoinIcon", hudCoinPill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(20f, 20f));
             Image hudCoinImg = hudCoinObj.AddComponent<Image>();
             hudCoinImg.sprite = WatercolorSpriteFactory.GetCoinSprite();
             hudCoinImg.raycastTarget = false;
-            TMP_Text hudCoinText = CreateLabel("CoinText", hudCoinPill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(60f, 0f), new Vector2(56f, 28f), "0", 19f, TextAlignmentOptions.Left, FontStyles.Bold);
+            TMP_Text hudCoinText = CreateLabel("CoinText", hudCoinPill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(44f, 0f), new Vector2(36f, 24f), "0", 17f, TextAlignmentOptions.Left, FontStyles.Bold);
             hudCoinText.color = new Color(1f, 0.86f, 0.3f, 1f);
             hudCoinText.enableAutoSizing = true; // big runs (1000+) shrink to fit instead of spilling out
-            hudCoinText.fontSizeMin = 12f;
-            hudCoinText.fontSizeMax = 19f;
+            hudCoinText.fontSizeMin = 10f;
+            hudCoinText.fontSizeMax = 17f;
             SetOutline(hudCoinText, 0.3f);
             hud.SetCoinCounter(hudCoinText, (RectTransform)hudCoinPill.transform);
             hudObj.SetActive(false);

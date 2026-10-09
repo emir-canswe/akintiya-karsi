@@ -33,9 +33,9 @@ namespace Upstream.Mechanics
         }
 
         /// <summary>Meters between two speed-ups.</summary>
-        public const float SpeedStepMeters = 250f;
-        /// <summary>River speed added at every step (about 6% of the start speed).</summary>
-        public const float SpeedStep = 15f;
+        public const float SpeedStepMeters = 200f;
+        /// <summary>River speed added at every step (about 11% of the start speed).</summary>
+        public const float SpeedStep = 16f;
 
         /// <summary>
         /// River speed for the distance swum: a small step up every <see cref="SpeedStepMeters"/>, reaching
