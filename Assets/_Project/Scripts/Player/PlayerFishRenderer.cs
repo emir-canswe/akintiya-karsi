@@ -24,6 +24,7 @@ namespace Upstream.Player
         private SpriteRenderer rightFinRenderer;
         private SpriteRenderer auraRenderer;
         private SpriteRenderer shadowRenderer;
+        private SpriteRenderer shieldRenderer;
 
         private float wagClock;
         private float currentVisualScale = 1f;
@@ -112,6 +113,15 @@ namespace Upstream.Player
             shadowRenderer = shadowObj.AddComponent<SpriteRenderer>();
             shadowRenderer.color = new Color(0f, 0.12f, 0.28f, 0.28f);
             shadowRenderer.sortingOrder = 3;
+
+            // Shield ability bubble (shown while the shield still has charges)
+            GameObject shieldObj = new GameObject("Shield");
+            shieldObj.transform.SetParent(visualRoot, false);
+            shieldObj.transform.localScale = Vector3.one * 2.9f;
+            shieldRenderer = shieldObj.AddComponent<SpriteRenderer>();
+            shieldRenderer.sprite = CartoonSpriteFactory.GetBubble();
+            shieldRenderer.sortingOrder = 11;
+            shieldRenderer.enabled = false;
 
             // Pectoral fins
             GameObject lFinObj = new GameObject("LeftFin");
@@ -221,6 +231,16 @@ namespace Upstream.Player
             leftFinRenderer.enabled = !blinkHide;
             rightFinRenderer.enabled = !blinkHide;
             shadowRenderer.enabled = !blinkHide;
+
+            // Shield bubble: gently pulsing while charged
+            bool shielded = healthSystem != null && healthSystem.ShieldCharges > 0;
+            shieldRenderer.enabled = shielded;
+            if (shielded)
+            {
+                float pulse = 0.55f + 0.2f * Mathf.Sin(Time.time * 4f);
+                shieldRenderer.color = new Color(0.55f, 0.95f, 1f, pulse);
+                shieldRenderer.transform.localScale = Vector3.one * (2.9f + 0.1f * Mathf.Sin(Time.time * 3f));
+            }
         }
     }
 }

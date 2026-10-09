@@ -23,7 +23,7 @@ namespace Upstream.Entities
         {
             if (!isActive) return;
             base.Tick(dt, flowSpeed);
-            if (isFlying || !isActive) return;
+            if (isFlying || !isActive || magnetized) return;
 
             // Small bobbing motion (absolute offset so it doesn't depend on frame rate)
             phase += dt * 3f;

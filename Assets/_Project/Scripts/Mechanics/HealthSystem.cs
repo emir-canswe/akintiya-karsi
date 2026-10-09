@@ -19,6 +19,10 @@ namespace Upstream.Mechanics
         private TurboSystem turboSystem;
         // +1 heart from a legendary fish; refreshed at the start of every run.
         private int bonusHearts;
+        private int shieldCharges;
+
+        /// <summary>Hits the shield ability will still block this run.</summary>
+        public int ShieldCharges => shieldCharges;
 
         public GameConfig Config
         {
@@ -106,7 +110,9 @@ namespace Upstream.Mechanics
 
         public void ResetHealth()
         {
-            bonusHearts = FishShop.Equipped.extraHeart ? 1 : 0;
+            FishDef fish = FishShop.Active;
+            bonusHearts = fish.extraHeart ? 1 : 0;
+            shieldCharges = fish.ShieldCharges;
             currentHP = MaxHP;
             invincibilityTimer = 0f;
             GameEvents.OnHealthChanged?.Invoke(currentHP);
@@ -116,6 +122,15 @@ namespace Upstream.Mechanics
         {
             if (IsInvincible) return false;
             if (Turbo != null && Turbo.IsTurboActive) return false;
+
+            if (shieldCharges > 0)
+            {
+                // Shield ability soaks the hit: no heart lost, short grace period.
+                shieldCharges--;
+                SetInvincible(1f);
+                GameEvents.OnShieldBlocked?.Invoke(shieldCharges);
+                return false;
+            }
 
             currentHP = Mathf.Max(0, currentHP - 1);
             GameEvents.OnPlayerHurt?.Invoke(currentHP);

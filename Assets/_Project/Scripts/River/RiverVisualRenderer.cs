@@ -67,6 +67,7 @@ namespace Upstream.River
             GameEvents.OnGrowthStageChanged += HandleStageUp;
             GameEvents.OnCoinCollected += HandleCoinCollected;
             GameEvents.OnWaveHit += HandleWaveHit;
+            GameEvents.OnShieldBlocked += HandleShieldBlocked;
         }
 
         private void OnDisable()
@@ -77,6 +78,7 @@ namespace Upstream.River
             GameEvents.OnGrowthStageChanged -= HandleStageUp;
             GameEvents.OnCoinCollected -= HandleCoinCollected;
             GameEvents.OnWaveHit -= HandleWaveHit;
+            GameEvents.OnShieldBlocked -= HandleShieldBlocked;
         }
 
         private float RiverHalfWidth => gameConfig != null ? gameConfig.riverHalfWidth : 150f;
@@ -252,6 +254,12 @@ namespace Upstream.River
         {
             Vector2 pos = PlayerPos(new Vector2(0f, 16f), new Vector2(0f, -120f));
             SpawnBurst(pos, new Color(1f, 0.86f, 0.25f, 1f), 5, 90f, 0.20f);
+        }
+
+        private void HandleShieldBlocked(int chargesLeft)
+        {
+            Vector2 pos = PlayerPos(Vector2.zero, new Vector2(0f, -140f));
+            SpawnBurst(pos, new Color(0.6f, 0.95f, 1f, 1f), 14, 150f, 0.3f, asBubbles: true);
         }
 
         private void HandleWaveHit()

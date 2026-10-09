@@ -54,6 +54,14 @@ namespace Upstream.Core
 
         public static FishDef Equipped => FishCatalog.Get(SaveSystem.Load().equippedFish);
 
+        private static FishDef active;
+
+        /// <summary>The equipped fish, cached for gameplay code that asks every frame (no file reads).</summary>
+        public static FishDef Active => active ?? (active = Equipped);
+
+        /// <summary>Re-reads the equipped fish from the save (start of every run).</summary>
+        public static void RefreshActive() => active = Equipped;
+
         public static bool Owns(int fishId) => Owns(SaveSystem.Load(), fishId);
 
         public static BuyResult Buy(FishDef fish)
@@ -71,6 +79,7 @@ namespace Upstream.Core
             var save = SaveSystem.Load();
             if (!TryEquip(save, fish.id)) return;
             SaveSystem.Save(save);
+            active = fish;
             OnFishEquipped?.Invoke(fish);
         }
 

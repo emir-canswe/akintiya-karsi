@@ -11,10 +11,22 @@ namespace Upstream.Tests
         // --- Catalog ---
 
         [Test]
-        public void Catalog_Has20Fish_WithStableUniqueIds()
+        public void Catalog_Has30Fish_WithUniqueIds()
         {
-            Assert.AreEqual(20, FishCatalog.Count);
-            CollectionAssert.AreEqual(Enumerable.Range(0, 20).ToList(), FishCatalog.All.Select(f => f.id).ToList());
+            Assert.AreEqual(30, FishCatalog.Count);
+            // IDs live in save files: every one from 0..29 exists exactly once (order may differ).
+            CollectionAssert.AreEquivalent(Enumerable.Range(0, 30).ToList(), FishCatalog.All.Select(f => f.id).ToList());
+        }
+
+        [Test]
+        public void EveryFishButTheStarter_HasAnAbility_WithADescription()
+        {
+            foreach (var fish in FishCatalog.All)
+            {
+                if (fish.id == FishCatalog.StarterId) { Assert.AreEqual(FishAbility.None, fish.ability); continue; }
+                Assert.AreNotEqual(FishAbility.None, fish.ability, fish.nameEn);
+                Assert.IsFalse(string.IsNullOrWhiteSpace(Upstream.UI.FishShopScreen.AbilityText(fish)), fish.nameEn);
+            }
         }
 
         [Test]

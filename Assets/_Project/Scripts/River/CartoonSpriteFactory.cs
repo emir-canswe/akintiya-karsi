@@ -13,10 +13,10 @@ namespace Upstream.River
         private delegate float Sdf(Vector2 p);
         private delegate Color Fill(Vector2 p, float d);
 
-        private static Sprite shrimp, star, rock, log, shark, hook, heart, bubble, glint, sparkle;
+        private static Sprite shrimp, star, rock, log, hook, heart, bubble, glint, sparkle;
         private static Sprite caustics, grassTile, shoreTile, waterGlow;
         private static Sprite tree, flowerBush, mushroom, stone, lilyPad;
-        private static Sprite barFill, homeIcon, playIcon, pauseIcon, sharkTail, wave, closeIcon;
+        private static Sprite barFill, homeIcon, playIcon, pauseIcon, wave, closeIcon, dragIcon;
 
         public static readonly Color GrassColor = Hex("#6CCB4A");
 
@@ -345,105 +345,6 @@ namespace Upstream.River
         }
 
         /// <summary>
-        /// Shark seen from above, nose pointing down (it swims toward the player). Streamlined torpedo body,
-        /// slate-blue back over a pale belly rim (countershading), gill slits, a shaded dorsal fin, swept-back
-        /// pectoral fins and small sharp eyes. The tail is a separate sprite (<see cref="GetSharkTail"/>).
-        /// </summary>
-        public static Sprite GetShark()
-        {
-            if (shark != null) return shark;
-            const int w = 96, h = 128;
-            Vector2 c = new Vector2(48f, h * 0.46f);
-            float noseY = c.y - 47f, tailY = c.y + 36f;
-            Color spine = Hex("#34557F"), back = Hex("#4C74A6"), side = Hex("#7FA4D3"), belly = Hex("#DCEBFA");
-            Color finDark = Hex("#2E4C74"), finLit = Hex("#5B82B6"), gill = Hex("#22395C"), outline = Hex("#122746");
-
-            // Torpedo profile: half-width along the body (0 at the nose, 1 at the tail base).
-            float HalfWidth(float t)
-            {
-                t = Mathf.Clamp01(t);
-                return 18.5f * Mathf.Pow(t, 0.5f) * Mathf.Pow(1f - t, 0.7f) / 0.4432f;
-            }
-            float Body(Vector2 p)
-            {
-                float t = (p.y - noseY) / (tailY - noseY);
-                if (t < 0f) return (p - new Vector2(c.x, noseY)).magnitude;
-                if (t > 1f) return (p - new Vector2(c.x, tailY)).magnitude;
-                return Mathf.Abs(p.x - c.x) - HalfWidth(t);
-            }
-            float BodyY(float t) => Mathf.Lerp(noseY, tailY, t);
-            // Pectoral fins: long, swept back toward the tail.
-            Vector2 finR = new Vector2(c.x + 21f, BodyY(0.42f) + 7f), finL = new Vector2(c.x - 21f, BodyY(0.42f) + 7f);
-            float Fins(Vector2 p)
-            {
-                float r = SdEllipse(Rotate(p, finR, -32f), finR, new Vector2(15f, 5f));
-                float l = SdEllipse(Rotate(p, finL, 32f), finL, new Vector2(15f, 5f));
-                return Mathf.Min(r, l);
-            }
-
-            Sdf sdf = p => SmoothMin(Body(p), Fins(p), 4f);
-            Fill fill = (p, d) =>
-            {
-                float t = Mathf.Clamp01((p.y - noseY) / (tailY - noseY));
-                float hw = Mathf.Max(HalfWidth(t), 0.01f);
-                float across = Mathf.Abs(p.x - c.x) / hw; // 0 spine .. 1 rim
-
-                Color col;
-                if (Body(p) > 0f)
-                {
-                    // Fin: darker root, lighter leading edge
-                    col = Color.Lerp(finDark, finLit, Mathf.Clamp01((p.y - (finR.y - 6f)) / 12f));
-                }
-                else
-                {
-                    // Countershading: dark spine -> lighter flanks -> pale belly peeking at the rim
-                    col = Color.Lerp(spine, back, Smooth(0f, 0.45f, across));
-                    col = Color.Lerp(col, side, Smooth(0.45f, 0.85f, across));
-                    col = Color.Lerp(col, belly, Smooth(0.86f, 1f, across) * 0.8f);
-                    // Lighter snout
-                    col = Color.Lerp(col, side, Mathf.Clamp01((0.18f - t) / 0.18f) * 0.6f);
-
-                    // Dorsal fin: narrow shaded wedge on the spine with a lit edge
-                    float dt = (t - 0.46f) / 0.26f;
-                    if (dt > 0f && dt < 1f)
-                    {
-                        float half = 5f * (1f - dt);
-                        float dx = p.x - c.x;
-                        if (Mathf.Abs(dx) < half) col = dx < -half * 0.35f ? finLit : finDark;
-                    }
-
-                    // Gill slits: three short curved lines on each flank
-                    for (int g = 0; g < 3; g++)
-                    {
-                        float gt = 0.28f + g * 0.045f;
-                        float gy = BodyY(gt);
-                        float gx = HalfWidth(gt) * 0.72f;
-                        for (int k = -1; k <= 1; k += 2)
-                        {
-                            Vector2 q = p - new Vector2(c.x + gx * k, gy);
-                            if (Mathf.Abs(q.y - q.x * q.x * 0.04f) < 0.7f && Mathf.Abs(q.x) < 3.2f) col = gill;
-                        }
-                    }
-
-                    // Eyes: small, dark, with a glint, set back from the snout
-                    for (int k = -1; k <= 1; k += 2)
-                    {
-                        float et = 0.17f;
-                        Vector2 eye = new Vector2(c.x + HalfWidth(et) * 0.62f * k, BodyY(et));
-                        float e = SdEllipse(p, eye, new Vector2(2.6f, 3.1f));
-                        if (e < 0f) col = Hex("#0B1426");
-                        if ((p - (eye + new Vector2(-0.8f * k, 0.9f))).magnitude < 0.75f) col = Color.white;
-                        // Faint brow ridge shadow above the eye
-                        if (e > 0f && e < 1.4f && p.y > eye.y) col = Color.Lerp(col, spine, 0.5f);
-                    }
-                }
-                return Shine(col, p, new Vector2(c.x - 6f, c.y + 10f), 10f, 0.25f);
-            };
-            shark = ToSprite(Paint(w, h, sdf, fill, outline, 2.1f), new Vector2(0.5f, 0.46f), 1.15f);
-            return shark;
-        }
-
-        /// <summary>
         /// Rolling wave band: deep blue at the back, lighter toward the front, a scalloped white foam crest
         /// facing downstream (the bottom). 9-sliced so it can stretch across any width.
         /// </summary>
@@ -478,28 +379,243 @@ namespace Upstream.River
             return wave;
         }
 
-        /// <summary>Distance from the shark sprite's pivot to where the tail attaches (world units).</summary>
-        public const float SharkTailAttachY = 30f / 1.15f;
+        // ------------------------------------------------------------------ predators
 
-        /// <summary>Shark tail (stalk + forked fin) pointing up, pivot at its base so it can wag.</summary>
-        public static Sprite GetSharkTail()
+        /// <summary>Look of one predator species, painted top-down with the nose pointing down.</summary>
+        private class PredatorSpec
         {
-            if (sharkTail != null) return sharkTail;
+            public float nose, tailEnd;          // body extent below/above the pivot (texture px)
+            public float halfWidth;              // widest half-width (px)
+            public float a = 0.5f, b = 0.7f;     // profile exponents: halfWidth ∝ t^a (1-t)^b
+            public Color spine, back, side, belly, finDark, finLit, outline, gill;
+            public float finT = 0.42f, finOut = 21f, finLen = 15f, finThick = 5f, finAngle = 32f;
+            public float eyeT = 0.17f, eyeSize = 1f;
+            public bool dorsal, gills, teeth, whiskers, spots, blotches, brows;
+            public float tailAttach;             // px above the pivot where the tail joins
+            public float tailScale = 1f;
+            public bool roundTail;
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<Data.PredatorKind, Sprite> predatorBodies =
+            new System.Collections.Generic.Dictionary<Data.PredatorKind, Sprite>();
+        private static readonly System.Collections.Generic.Dictionary<Data.PredatorKind, Sprite> predatorTails =
+            new System.Collections.Generic.Dictionary<Data.PredatorKind, Sprite>();
+
+        private static PredatorSpec Spec(Data.PredatorKind kind)
+        {
+            switch (kind)
+            {
+                case Data.PredatorKind.Pike:
+                    // Long, slim ambush hunter: olive-green with pale bean spots and a duck-bill snout
+                    return new PredatorSpec
+                    {
+                        nose = 54f, tailEnd = 46f, halfWidth = 9.5f, a = 0.62f, b = 0.5f,
+                        spine = Hex("#3E5A2A"), back = Hex("#5F8A3A"), side = Hex("#9CBF5C"), belly = Hex("#E8F0C0"),
+                        finDark = Hex("#6E7F2C"), finLit = Hex("#B9C760"), outline = Hex("#1E2E12"), gill = Hex("#2A3D1A"),
+                        finT = 0.55f, finOut = 12f, finLen = 9f, finThick = 3.5f, finAngle = 30f,
+                        eyeT = 0.13f, eyeSize = 0.9f, spots = true, gills = true, tailAttach = 40f, tailScale = 0.8f,
+                    };
+                case Data.PredatorKind.Piranha:
+                    // Small, round, red-bellied and toothy (comes in schools)
+                    return new PredatorSpec
+                    {
+                        nose = 22f, tailEnd = 18f, halfWidth = 15f, a = 0.45f, b = 0.5f,
+                        spine = Hex("#3B4150"), back = Hex("#6A5560"), side = Hex("#D9524A"), belly = Hex("#FF6A4D"),
+                        finDark = Hex("#B5322B"), finLit = Hex("#E8604F"), outline = Hex("#1A1C24"), gill = Hex("#2B2F3A"),
+                        finT = 0.45f, finOut = 15f, finLen = 7f, finThick = 3.5f, finAngle = 28f,
+                        eyeT = 0.28f, eyeSize = 1.15f, teeth = true, brows = true, tailAttach = 13f, tailScale = 0.6f,
+                    };
+                case Data.PredatorKind.Catfish:
+                    // Big, wide, slow bottom-dweller with whiskers and mottled skin
+                    return new PredatorSpec
+                    {
+                        nose = 46f, tailEnd = 36f, halfWidth = 24f, a = 0.32f, b = 0.9f,
+                        spine = Hex("#4A3B2A"), back = Hex("#6E5A3E"), side = Hex("#9C8460"), belly = Hex("#E2D3B0"),
+                        finDark = Hex("#5A4A33"), finLit = Hex("#8C7550"), outline = Hex("#24190E"), gill = Hex("#33281C"),
+                        finT = 0.33f, finOut = 26f, finLen = 15f, finThick = 6f, finAngle = 25f,
+                        eyeT = 0.13f, eyeSize = 0.75f, whiskers = true, blotches = true, tailAttach = 27f, tailScale = 1.05f, roundTail = true,
+                    };
+                default:
+                    // Shark: slate-blue back over a pale belly rim, gill slits, shaded dorsal fin
+                    return new PredatorSpec
+                    {
+                        nose = 47f, tailEnd = 36f, halfWidth = 18.5f,
+                        spine = Hex("#34557F"), back = Hex("#4C74A6"), side = Hex("#7FA4D3"), belly = Hex("#DCEBFA"),
+                        finDark = Hex("#2E4C74"), finLit = Hex("#5B82B6"), outline = Hex("#122746"), gill = Hex("#22395C"),
+                        dorsal = true, gills = true, tailAttach = 30f,
+                    };
+            }
+        }
+
+        /// <summary>World-unit distance from a predator's pivot to where its tail attaches.</summary>
+        public static float PredatorTailAttachY(Data.PredatorKind kind) => Spec(kind).tailAttach / 1.15f;
+
+        /// <summary>Predator body seen from above, nose down. The tail is separate (<see cref="GetPredatorTail"/>).</summary>
+        public static Sprite GetPredatorBody(Data.PredatorKind kind)
+        {
+            if (predatorBodies.TryGetValue(kind, out Sprite cached) && cached != null) return cached;
+            PredatorSpec sp = Spec(kind);
+            const int w = 96, h = 128;
+            Vector2 c = new Vector2(48f, h * 0.46f);
+            float noseY = c.y - sp.nose, tailY = c.y + sp.tailEnd;
+            float norm = Mathf.Pow(sp.a / (sp.a + sp.b), sp.a) * Mathf.Pow(sp.b / (sp.a + sp.b), sp.b);
+
+            float HalfWidth(float t)
+            {
+                t = Mathf.Clamp01(t);
+                return sp.halfWidth * Mathf.Pow(t, sp.a) * Mathf.Pow(1f - t, sp.b) / norm;
+            }
+            float BodyY(float t) => Mathf.Lerp(noseY, tailY, t);
+            float Body(Vector2 p)
+            {
+                float t = (p.y - noseY) / (tailY - noseY);
+                if (t < 0f) return (p - new Vector2(c.x, noseY)).magnitude;
+                if (t > 1f) return (p - new Vector2(c.x, tailY)).magnitude;
+                return Mathf.Abs(p.x - c.x) - HalfWidth(t);
+            }
+            Vector2 finR = new Vector2(c.x + sp.finOut, BodyY(sp.finT) + sp.finLen * 0.45f);
+            Vector2 finL = new Vector2(c.x - sp.finOut, finR.y);
+            float Fins(Vector2 p)
+            {
+                float r = SdEllipse(Rotate(p, finR, -sp.finAngle), finR, new Vector2(sp.finLen, sp.finThick));
+                float l = SdEllipse(Rotate(p, finL, sp.finAngle), finL, new Vector2(sp.finLen, sp.finThick));
+                return Mathf.Min(r, l);
+            }
+            // Catfish whiskers: thin curved barbels sweeping out from the snout
+            float Whiskers(Vector2 p)
+            {
+                if (!sp.whiskers) return 99f;
+                float d = 99f;
+                for (int k = -1; k <= 1; k += 2)
+                {
+                    for (int j = 0; j < 2; j++)
+                    {
+                        Vector2 root = new Vector2(c.x + k * (4f + j * 5f), noseY + 3f + j * 4f);
+                        Vector2 q = p - root;
+                        float along = q.x * k; // outward distance
+                        if (along < 0f || along > 30f - j * 8f) continue;
+                        float curveY = -along * 0.45f + along * along * 0.012f; // droops forward, then curls
+                        d = Mathf.Min(d, Mathf.Abs(q.y - curveY) - 1.4f + along * 0.02f);
+                    }
+                }
+                return d;
+            }
+
+            Sdf sdf = p => Mathf.Min(SmoothMin(Body(p), Fins(p), 4f), Whiskers(p));
+            Fill fill = (p, d) =>
+            {
+                if (Whiskers(p) < 0f && Body(p) > 0f) return sp.finDark;
+                float t = Mathf.Clamp01((p.y - noseY) / (tailY - noseY));
+                float hw = Mathf.Max(HalfWidth(t), 0.01f);
+                float across = Mathf.Abs(p.x - c.x) / hw;
+
+                Color col;
+                if (Body(p) > 0f)
+                {
+                    col = Color.Lerp(sp.finDark, sp.finLit, Mathf.Clamp01((p.y - (finR.y - 6f)) / 12f));
+                }
+                else
+                {
+                    // Countershading: dark spine -> lighter flanks -> belly color at the rim
+                    col = Color.Lerp(sp.spine, sp.back, Smooth(0f, 0.45f, across));
+                    col = Color.Lerp(col, sp.side, Smooth(0.45f, 0.85f, across));
+                    col = Color.Lerp(col, sp.belly, Smooth(0.84f, 1f, across) * 0.85f);
+                    col = Color.Lerp(col, sp.side, Mathf.Clamp01((0.18f - t) / 0.18f) * 0.5f);
+
+                    if (sp.spots)
+                    {
+                        // Pale bean-shaped spots in rows along the flanks
+                        float gx = (p.x - c.x) / 4.2f, gy = (p.y - noseY) / 7f;
+                        float cellX = Mathf.Floor(gx), cellY = Mathf.Floor(gy);
+                        Vector2 inCell = new Vector2(Frac(gx) - 0.5f, Frac(gy) - 0.5f);
+                        if (across > 0.3f && t > 0.2f && t < 0.95f && Hash(cellX, cellY) > 0.45f &&
+                            (inCell.x * inCell.x * 4f + inCell.y * inCell.y * 9f) < 0.5f)
+                            col = Color.Lerp(col, sp.belly, 0.7f);
+                    }
+                    if (sp.blotches)
+                    {
+                        float n = Mathf.PerlinNoise(p.x * 0.18f + 7f, p.y * 0.18f + 3f);
+                        if (n > 0.58f && across < 0.85f) col = Color.Lerp(col, sp.spine, 0.55f);
+                    }
+                    if (sp.dorsal)
+                    {
+                        float dt = (t - 0.46f) / 0.26f;
+                        if (dt > 0f && dt < 1f)
+                        {
+                            float half = 5f * (1f - dt);
+                            float dx = p.x - c.x;
+                            if (Mathf.Abs(dx) < half) col = dx < -half * 0.35f ? sp.finLit : sp.finDark;
+                        }
+                    }
+                    if (sp.gills)
+                    {
+                        for (int g = 0; g < 3; g++)
+                        {
+                            float gt = (sp.dorsal ? 0.28f : 0.22f) + g * 0.045f;
+                            float gy = BodyY(gt);
+                            float gx = HalfWidth(gt) * 0.72f;
+                            for (int k = -1; k <= 1; k += 2)
+                            {
+                                Vector2 q = p - new Vector2(c.x + gx * k, gy);
+                                if (Mathf.Abs(q.y - q.x * q.x * 0.04f) < 0.7f && Mathf.Abs(q.x) < Mathf.Min(3.2f, gx * 0.5f)) col = sp.gill;
+                            }
+                        }
+                    }
+                    if (sp.teeth)
+                    {
+                        // White zigzag teeth along the snout
+                        Vector2 m = p - new Vector2(c.x, noseY + 5f);
+                        if (m.y < 2.5f && m.y > -1.5f && Mathf.Abs(m.x) < 9f &&
+                            Mathf.Abs(Frac(m.x / 3f) - 0.5f) * 3f < (2.5f - m.y) * 0.45f)
+                            col = Color.white;
+                    }
+
+                    // Eyes with a glint (and angry brows for piranhas)
+                    for (int k = -1; k <= 1; k += 2)
+                    {
+                        Vector2 eye = new Vector2(c.x + HalfWidth(sp.eyeT) * 0.62f * k, BodyY(sp.eyeT));
+                        float e = SdEllipse(p, eye, new Vector2(2.6f, 3.1f) * sp.eyeSize);
+                        if (e < 0f) col = Hex("#0B1426");
+                        if ((p - (eye + new Vector2(-0.8f * k, 0.9f) * sp.eyeSize)).magnitude < 0.75f * sp.eyeSize) col = Color.white;
+                        if (sp.brows)
+                        {
+                            Vector2 b0 = eye + new Vector2(-4f * k, 5f), b1 = eye + new Vector2(3.5f * k, 3f);
+                            Vector2 ab = b1 - b0;
+                            float bt = Mathf.Clamp01(Vector2.Dot(p - b0, ab) / ab.sqrMagnitude);
+                            if ((p - (b0 + ab * bt)).magnitude < 1.1f) col = sp.outline;
+                        }
+                        else if (e > 0f && e < 1.4f && p.y > eye.y) col = Color.Lerp(col, sp.spine, 0.5f);
+                    }
+                }
+                return Shine(col, p, new Vector2(c.x - sp.halfWidth * 0.3f, c.y + 10f), sp.halfWidth * 0.6f, 0.25f);
+            };
+            Sprite s = ToSprite(Paint(w, h, sdf, fill, sp.outline, 2.1f), new Vector2(0.5f, 0.46f), 1.15f);
+            predatorBodies[kind] = s;
+            return s;
+        }
+
+        /// <summary>Predator tail pointing up, pivot at its base so it can beat on its own.</summary>
+        public static Sprite GetPredatorTail(Data.PredatorKind kind)
+        {
+            if (predatorTails.TryGetValue(kind, out Sprite cached) && cached != null) return cached;
+            PredatorSpec sp = Spec(kind);
             const int w = 52, h = 48;
-            Vector2 b = new Vector2(26f, 2f); // attachment point
-            Color fin = Hex("#2E4C74"), finLit = Hex("#5B82B6"), outline = Hex("#122746");
+            Vector2 b = new Vector2(26f, 2f);
+            float k = sp.tailScale;
             Sdf sdf = p =>
             {
-                // Stalk flowing into two swept lobes (a forked crescent), blended into one shape
-                float stalk = SdEllipse(p, b + new Vector2(0f, 12f), new Vector2(5.5f, 13f));
+                Vector2 q = b + (p - b) / k; // scale the shape around its base
+                float stalk = SdEllipse(q, b + new Vector2(0f, 12f), new Vector2(5.5f, 13f));
+                if (sp.roundTail) return SmoothMin(stalk, SdEllipse(q, b + new Vector2(0f, 26f), new Vector2(13f, 12f)), 6f) * k;
                 Vector2 lc = b + new Vector2(-7f, 24f), rc = b + new Vector2(7f, 24f);
-                float l = SdEllipse(Rotate(p, lc, 38f), lc, new Vector2(5.5f, 15f));
-                float r = SdEllipse(Rotate(p, rc, -38f), rc, new Vector2(5.5f, 15f));
-                return SmoothMin(stalk, SmoothMin(l, r, 6f), 9f);
+                float l = SdEllipse(Rotate(q, lc, 38f), lc, new Vector2(5.5f, 15f));
+                float r = SdEllipse(Rotate(q, rc, -38f), rc, new Vector2(5.5f, 15f));
+                return SmoothMin(stalk, SmoothMin(l, r, 6f), 9f) * k;
             };
-            Fill fill = (p, d) => p.x < b.x ? finLit : fin;
-            sharkTail = ToSprite(Paint(w, h, sdf, fill, outline, 2.3f), new Vector2(0.5f, b.y / h), 1.15f);
-            return sharkTail;
+            Fill fill = (p, d) => p.x < b.x ? sp.finLit : sp.finDark;
+            Sprite s = ToSprite(Paint(w, h, sdf, fill, sp.outline, 2.1f), new Vector2(0.5f, b.y / h), 1.15f);
+            predatorTails[kind] = s;
+            return s;
         }
 
         /// <summary>Shiny hook with a wiggly pink worm (the bait that hides the danger).</summary>
@@ -594,6 +710,24 @@ namespace Upstream.River
             };
             homeIcon = ToSprite(Paint(s, s, sdf, (p, d) => Color.white, Hex("#1B2A5C"), 2f), new Vector2(0.5f, 0.5f), 1f);
             return homeIcon;
+        }
+
+        /// <summary>White double-headed horizontal arrow ("drag left/right") with a dark outline.</summary>
+        public static Sprite GetDragIcon()
+        {
+            if (dragIcon != null) return dragIcon;
+            const int s = 48;
+            Sdf sdf = p =>
+            {
+                Vector2 q = new Vector2(Mathf.Abs(p.x - 24f), p.y - 24f); // mirrored: one arrow head serves both sides
+                float shaft = SdBox(q, new Vector2(0f, 0f), new Vector2(12f, 3.2f), 1.5f);
+                // Arrow head: triangle pointing outward (+x), tip at x=21
+                Vector2 h = q - new Vector2(21f, 0f);
+                float head = Mathf.Max(Mathf.Max(h.x * 0.8f + Mathf.Abs(h.y) * 0.6f, -h.x - 9f), Mathf.Abs(h.y) - 9f) - 0.5f;
+                return Mathf.Min(shaft, head);
+            };
+            dragIcon = ToSprite(Paint(s, s, sdf, (p, d) => Color.white, Hex("#1B2A5C"), 2f), new Vector2(0.5f, 0.5f), 1f);
+            return dragIcon;
         }
 
         /// <summary>White "close" cross with rounded arms and a dark outline.</summary>

@@ -18,6 +18,8 @@ namespace Upstream.Entities
     {
         public bool isActive;
         public bool isFlying;
+        /// <summary>Being pulled in by a magnet fish: pickups stop their own bobbing.</summary>
+        public bool magnetized;
         public float yPosition;
         protected Vector2 flyVelocity;
         protected float flyRotationSpeed;
@@ -35,6 +37,7 @@ namespace Upstream.Entities
             if (cachedTransform == null) cachedTransform = transform;
             isActive = true;
             isFlying = false;
+            magnetized = false;
             cachedTransform.position = new Vector3(position.x, position.y, 0f);
             cachedTransform.rotation = Quaternion.identity;
             yPosition = position.y;
@@ -46,6 +49,15 @@ namespace Upstream.Entities
             isActive = false;
             isFlying = false;
             gameObject.SetActive(false);
+        }
+
+        /// <summary>Magnet ability: glide toward <paramref name="target"/> (faster than the river flows).</summary>
+        public void Attract(Vector2 target, float dt)
+        {
+            magnetized = true;
+            Vector2 p = Vector2.MoveTowards(cachedTransform.position, target, 560f * dt);
+            cachedTransform.position = new Vector3(p.x, p.y, cachedTransform.position.z);
+            yPosition = p.y;
         }
 
         public virtual void Smash(float playerX = 0f)

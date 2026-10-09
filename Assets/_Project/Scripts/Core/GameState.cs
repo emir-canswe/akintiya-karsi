@@ -41,6 +41,8 @@ namespace Upstream.Core
         public static Action<int> OnCoinCollected;
         /// <summary>Coins picked up in the current run changed (arg: run total, before the end-of-run bonus).</summary>
         public static Action<int> OnRunCoinsChanged;
+        /// <summary>The fish's shield ability blocked a hit (arg: shield charges left).</summary>
+        public static Action<int> OnShieldBlocked;
         /// <summary>The fish swam into a wave and got slowed down.</summary>
         public static Action OnWaveHit;
         /// <summary>The player left the game over screen for the main menu.</summary>

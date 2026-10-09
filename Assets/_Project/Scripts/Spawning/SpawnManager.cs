@@ -265,7 +265,8 @@ namespace Upstream.Spawning
 
                     float goldBase = spawnConfig != null ? spawnConfig.goldFoodBaseChance : 0.07f;
                     float goldInc = spawnConfig != null ? spawnConfig.goldFoodChanceIncrease : 0.05f;
-                    if (goldFoodPool != null && Random.value < goldBase + difficulty * goldInc)
+                    float luck = FishShop.Active.LuckMultiplier;
+                    if (goldFoodPool != null && Random.value < (goldBase + difficulty * goldInc) * luck)
                     {
                         var gold = goldFoodPool.Get();
                         gold.OnSpawn(new Vector2(Random.Range(-rw + 32f, rw - 32f), startY + n * 34f + 40f));
@@ -273,7 +274,7 @@ namespace Upstream.Spawning
                     }
 
                     // Coin arc in the other half of the river: grab the food or the coins, not both.
-                    if (Random.value < 0.45f)
+                    if (Random.value < Mathf.Min(0.9f, 0.45f * luck))
                     {
                         float coinX = x > 0f ? Random.Range(-rw + 34f, -20f) : Random.Range(20f, rw - 34f);
                         SpawnCoinLine(coinX, startY + 10f, Random.Range(4, 7), 30f, 14f);
@@ -338,15 +339,22 @@ namespace Upstream.Spawning
                     break;
                 }
 
-                case PatternType.Shark: // Tracking Shark
+                case PatternType.Shark: // A predator: shark, pike, piranha school or catfish
                 {
-                    var shark = sharkPool.Get();
-                    shark.Initialize(playerTransform, spawnConfig);
-                    int largeStageReq = spawnConfig != null ? spawnConfig.largeSharksAfterStage : 3;
-                    shark.isLarge = stage >= largeStageReq && Random.value < 0.42f;
-                    shark.difficulty = difficulty;
-                    shark.OnSpawn(new Vector2(Random.Range(-rw + 40f, rw - 40f), startY + 40f));
-                    activeEntities.Add(shark);
+                    PredatorKind kind = PickPredator(difficulty);
+                    float px = Random.Range(-rw + 40f, rw - 40f);
+                    if (kind == PredatorKind.Piranha)
+                    {
+                        // School of three in a little V
+                        px = Mathf.Clamp(px, -rw + 60f, rw - 60f);
+                        SpawnPredator(kind, new Vector2(px, startY + 40f), stage, difficulty);
+                        SpawnPredator(kind, new Vector2(px - 30f, startY + 72f), stage, difficulty);
+                        SpawnPredator(kind, new Vector2(px + 30f, startY + 72f), stage, difficulty);
+                    }
+                    else
+                    {
+                        SpawnPredator(kind, new Vector2(px, startY + 40f), stage, difficulty);
+                    }
                     break;
                 }
 
@@ -377,6 +385,34 @@ namespace Upstream.Spawning
                     break;
                 }
             }
+        }
+
+        /// <summary>Which predator shows up: sharks from the start, the others join as the run gets harder.</summary>
+        private static PredatorKind PickPredator(float difficulty)
+        {
+            float shark = 1f;
+            float pike = difficulty > 0.2f ? 0.8f : 0f;
+            float piranha = difficulty > 0.3f ? 0.7f : 0f;
+            float catfish = difficulty > 0.35f ? 0.5f : 0f;
+            float r = Random.value * (shark + pike + piranha + catfish);
+            if ((r -= shark) < 0f) return PredatorKind.Shark;
+            if ((r -= pike) < 0f) return PredatorKind.Pike;
+            if ((r -= piranha) < 0f) return PredatorKind.Piranha;
+            return PredatorKind.Catfish;
+        }
+
+        private void SpawnPredator(PredatorKind kind, Vector2 pos, int stage, float difficulty)
+        {
+            var predator = sharkPool.Get();
+            predator.Initialize(playerTransform, spawnConfig);
+            predator.kind = kind;
+            int largeStageReq = spawnConfig != null ? spawnConfig.largeSharksAfterStage : 3;
+            // Catfish are always "large" (only a very big fish can eat them); sharks get big later on.
+            predator.isLarge = kind == PredatorKind.Catfish ||
+                               (kind == PredatorKind.Shark && stage >= largeStageReq && Random.value < 0.42f);
+            predator.difficulty = difficulty;
+            predator.OnSpawn(pos);
+            activeEntities.Add(predator);
         }
 
         /// <summary>

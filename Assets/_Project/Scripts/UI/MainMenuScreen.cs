@@ -12,7 +12,6 @@ namespace Upstream.UI
     public class MainMenuScreen : MonoBehaviour
     {
         [SerializeField] private TMP_Text titleText;
-        [SerializeField] private TMP_Text instructionText;
         [SerializeField] private Button playButton;
         [SerializeField] private TMP_Text bestScoreText;
         [SerializeField] private GameObject backdrop;
@@ -65,12 +64,11 @@ namespace Upstream.UI
         }
 
         /// <param name="menuBackdrop">Full-screen dim that lives outside the safe area; shown and hidden with the menu.</param>
-        public void Configure(TMP_Text title, TMP_Text how, Button play, TMP_Text best, GameObject menuBackdrop = null)
+        public void Configure(TMP_Text title, Button play, TMP_Text best, GameObject menuBackdrop = null)
         {
             backdrop = menuBackdrop;
             if (backdrop != null) backdrop.SetActive(isActiveAndEnabled);
             titleText = title;
-            instructionText = how;
             if (playButton != null) playButton.onClick.RemoveListener(StartFromMenu);
             playButton = play;
             if (playButton != null) playButton.onClick.AddListener(StartFromMenu);

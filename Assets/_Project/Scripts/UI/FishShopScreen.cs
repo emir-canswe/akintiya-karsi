@@ -235,11 +235,33 @@ namespace Upstream.UI
 
         public static string PerkText(FishDef fish)
         {
-            if (fish.coinBonus <= 0f && !fish.extraHeart) return LocalizationManager.Get("perk_none");
-            string text = "";
-            if (fish.coinBonus > 0f) text = LocalizationManager.Format("perk_coin", Mathf.RoundToInt(fish.coinBonus * 100f));
-            if (fish.extraHeart) text += (text.Length > 0 ? "\n" : "") + LocalizationManager.Get("perk_heart");
+            if (fish.ability == FishAbility.None && fish.coinBonus <= 0f && !fish.extraHeart) return LocalizationManager.Get("perk_none");
+            string text = AbilityText(fish);
+            string extras = "";
+            if (fish.coinBonus > 0f) extras = LocalizationManager.Format("perk_coin", Mathf.RoundToInt(fish.coinBonus * 100f));
+            if (fish.extraHeart) extras += (extras.Length > 0 ? " • " : "") + LocalizationManager.Get("perk_heart");
+            if (extras.Length > 0) text += (text.Length > 0 ? "\n" : "") + "<size=85%><color=#FFE38A>" + extras + "</color></size>";
             return text;
+        }
+
+        /// <summary>One line describing the fish's special ability, with its strength for this rarity.</summary>
+        public static string AbilityText(FishDef fish)
+        {
+            int Pct(float multiplier) => Mathf.RoundToInt((multiplier - 1f) * 100f);
+            switch (fish.ability)
+            {
+                case FishAbility.Magnet: return LocalizationManager.Get("ability_magnet");
+                case FishAbility.Agile: return LocalizationManager.Format("ability_agile", Pct(fish.SteeringMultiplier));
+                case FishAbility.LongTurbo: return LocalizationManager.Format("ability_longturbo", Pct(fish.TurboTimeMultiplier));
+                case FishAbility.Power: return LocalizationManager.Format("ability_power", Pct(fish.PowerMultiplier));
+                case FishAbility.Lucky: return LocalizationManager.Get("ability_lucky");
+                case FishAbility.Shield: return LocalizationManager.Get(fish.ShieldCharges > 1 ? "ability_shield2" : "ability_shield");
+                case FishAbility.WaveRider: return LocalizationManager.Get("ability_waverider");
+                case FishAbility.HookProof: return LocalizationManager.Get("ability_hookproof");
+                case FishAbility.RockBreaker: return LocalizationManager.Get("ability_rockbreaker");
+                case FishAbility.Slim: return LocalizationManager.Format("ability_slim", Mathf.RoundToInt((1f - fish.HitboxMultiplier) * 100f));
+                default: return "";
+            }
         }
     }
 }

@@ -187,7 +187,7 @@ namespace Upstream.Core
 
             FoodPickup foodPrefab = CreateEntityTemplate<FoodPickup>("FoodTemplate", templatesRoot, CartoonSpriteFactory.GetShrimp(), 5);
             GoldFoodPickup goldPrefab = CreateEntityTemplate<GoldFoodPickup>("GoldFoodTemplate", templatesRoot, CartoonSpriteFactory.GetStar(), 6);
-            SharkEnemy sharkPrefab = CreateEntityTemplate<SharkEnemy>("SharkTemplate", templatesRoot, CartoonSpriteFactory.GetShark(), 7, new Vector2(6f, -9f));
+            SharkEnemy sharkPrefab = CreateEntityTemplate<SharkEnemy>("SharkTemplate", templatesRoot, CartoonSpriteFactory.GetPredatorBody(PredatorKind.Shark), 7, new Vector2(6f, -9f));
             RockObstacle rockPrefab = CreateEntityTemplate<RockObstacle>("RockTemplate", templatesRoot, CartoonSpriteFactory.GetRock(), 4, new Vector2(5f, -7f));
             LogObstacle logPrefab = CreateEntityTemplate<LogObstacle>("LogTemplate", templatesRoot, CartoonSpriteFactory.GetLog(), 4, new Vector2(5f, -7f));
             HookTrap hookPrefab = CreateHookTemplate("HookTemplate", templatesRoot);
@@ -196,7 +196,7 @@ namespace Upstream.Core
 
             var foodPool = CreatePool("FoodPool", foodPrefab, 24, poolsRoot);
             var goldPool = CreatePool("GoldFoodPool", goldPrefab, 6, poolsRoot);
-            var sharkPool = CreatePool("SharkPool", sharkPrefab, 8, poolsRoot);
+            var sharkPool = CreatePool("SharkPool", sharkPrefab, 12, poolsRoot); // piranhas come in threes
             var rockPool = CreatePool("RockPool", rockPrefab, 10, poolsRoot);
             var logPool = CreatePool("LogPool", logPrefab, 8, poolsRoot);
             var hookPool = CreatePool("HookPool", hookPrefab, 8, poolsRoot);
@@ -435,13 +435,10 @@ namespace Upstream.Core
             bestStartText.color = Color.white;
             SetOutline(bestStartText, 0.28f);
 
-            // Short how-to hint at the bottom
-            TMP_Text howText = CreateLabel("HowTo", menuObj.transform, new Vector2(0.5f, 0.07f), new Vector2(0.5f, 0.07f), Vector2.zero, new Vector2(300f, 44f), "", 12f, TextAlignmentOptions.Center, FontStyles.Normal);
-            Localize(howText, "how_to");
-            howText.color = new Color(1f, 1f, 1f, 0.92f);
-            SetOutline(howText, 0.25f);
+            // How to play: four picture tips instead of a paragraph (kids read pictures first)
+            BuildTipsPanel(menuObj.transform, roundSpr);
 
-            mainMenu.Configure(titleText, howText, playBtn, bestStartText, menuDimObj);
+            mainMenu.Configure(titleText, playBtn, bestStartText, menuDimObj);
             mainMenu.SetMascot(mascot);
 
             // Coin balance (top-left)
@@ -692,6 +689,45 @@ namespace Upstream.Core
             return label;
         }
 
+        /// <summary>Bottom-of-menu "how to play" strip: icon + one or two words per tip.</summary>
+        private static void BuildTipsPanel(Transform menu, Sprite roundSpr)
+        {
+            GameObject panel = CreateUIRect("Tips", menu, new Vector2(0.5f, 0.075f), new Vector2(0.5f, 0.075f), Vector2.zero, new Vector2(304f, 70f));
+            Image bg = panel.AddComponent<Image>();
+            bg.sprite = roundSpr;
+            bg.type = Image.Type.Sliced;
+            bg.color = new Color(0.07f, 0.16f, 0.45f, 0.72f);
+            bg.raycastTarget = false;
+            var border = panel.AddComponent<Outline>();
+            border.effectColor = new Color(1f, 1f, 1f, 0.35f);
+            border.effectDistance = new Vector2(2f, -2f);
+
+            (Sprite icon, Vector2 size, string key)[] tips =
+            {
+                (CartoonSpriteFactory.GetDragIcon(), new Vector2(30f, 30f), "tip_drag"),
+                (CartoonSpriteFactory.GetShrimp(), new Vector2(34f, 34f), "tip_eat"),
+                (CartoonSpriteFactory.GetPredatorBody(PredatorKind.Shark), new Vector2(26f, 34f), "tip_shark"),
+                (WatercolorSpriteFactory.GetCoinSprite(), new Vector2(26f, 26f), "tip_coins"),
+            };
+            const float colW = 76f;
+            for (int i = 0; i < tips.Length; i++)
+            {
+                float x = (i - (tips.Length - 1) * 0.5f) * colW;
+                GameObject iconObj = CreateUIRect($"TipIcon_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 11f), tips[i].size);
+                Image img = iconObj.AddComponent<Image>();
+                img.sprite = tips[i].icon;
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+
+                TMP_Text label = CreateLabel($"TipLabel_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -20f), new Vector2(colW - 4f, 18f), "", 11f, TextAlignmentOptions.Center, FontStyles.Bold);
+                label.enableAutoSizing = true;
+                label.fontSizeMin = 8f;
+                label.fontSizeMax = 11f;
+                SetOutline(label, 0.25f);
+                Localize(label, tips[i].key);
+            }
+        }
+
         /// <summary>Round blue candy button with a white icon, anchored to the parent's top-right corner.</summary>
         private static Button CreateRoundIconButton(string name, Transform parent, Vector2 anchoredPos, Sprite icon, float iconSize)
         {
@@ -790,13 +826,13 @@ namespace Upstream.Core
             FishPreview bigPreview = FishPreview.Create(stageObj.transform, Vector2.zero, 110f, true);
             bigPreview.transform.localRotation = Quaternion.Euler(0f, 0f, -90f); // swims sideways across the tank
 
-            TMP_Text nameText = CreateLabel("Name", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-40f, -148f), new Vector2(190f, 28f), "", 19f, TextAlignmentOptions.Left, FontStyles.Bold);
+            TMP_Text nameText = CreateLabel("Name", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-40f, -142f), new Vector2(190f, 26f), "", 19f, TextAlignmentOptions.Left, FontStyles.Bold);
             nameText.enableAutoSizing = true;
             nameText.fontSizeMin = 12f;
             nameText.fontSizeMax = 19f;
             SetOutline(nameText, 0.25f);
 
-            GameObject rarityObj = CreateUIRect("RarityPill", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(98f, -148f), new Vector2(92f, 24f));
+            GameObject rarityObj = CreateUIRect("RarityPill", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(98f, -142f), new Vector2(92f, 24f));
             Image rarityPill = rarityObj.AddComponent<Image>();
             rarityPill.sprite = roundSpr;
             rarityPill.type = Image.Type.Sliced;
@@ -805,8 +841,12 @@ namespace Upstream.Core
             rarityText.color = Color.white;
             SetOutline(rarityText, 0.25f);
 
-            TMP_Text perkText = CreateLabel("Perk", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-40f, -178f), new Vector2(190f, 30f), "", 13f, TextAlignmentOptions.Left, FontStyles.Bold);
+            TMP_Text perkText = CreateLabel("Perk", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -170f), new Vector2(276f, 26f), "", 12f, TextAlignmentOptions.Center, FontStyles.Bold);
             perkText.color = new Color(0.75f, 1f, 0.8f, 1f);
+            perkText.enableAutoSizing = true;
+            perkText.fontSizeMin = 8f;
+            perkText.fontSizeMax = 12f;
+            SetOutline(perkText, 0.2f);
 
             Button action = CreateTextButton("ShopAction", detail.transform, new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(272f, 46f), null, roundSpr, Color.white, 17f, Color.white);
 

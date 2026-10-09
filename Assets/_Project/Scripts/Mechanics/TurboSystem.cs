@@ -35,7 +35,8 @@ namespace Upstream.Mechanics
         public float PowerPercent => Mathf.Clamp01(currentPower / Config.maxPower);
         public float TurboTimeRemaining => turboTimer;
         public bool IsTurboActive => turboTimer > 0f;
-        public float TurboPercent => IsTurboActive ? Mathf.Clamp01(turboTimer / Config.turboTime) : 0f;
+        public float TurboPercent => IsTurboActive ? Mathf.Clamp01(turboTimer / Mathf.Max(0.01f, turboDuration)) : 0f;
+        private float turboDuration = 1f;
 
         private void Awake()
         {
@@ -89,7 +90,7 @@ namespace Upstream.Mechanics
             float multiplier = (growthSystem != null && growthSystem.CurrentStageData != null)
                 ? growthSystem.CurrentStageData.powerBarFillMultiplier
                 : 1f;
-            currentPower += amount * multiplier;
+            currentPower += amount * multiplier * FishShop.Active.PowerMultiplier;
 
             if (currentPower >= Config.maxPower)
             {
@@ -100,7 +101,8 @@ namespace Upstream.Mechanics
         public void ActivateTurbo()
         {
             currentPower = 0f;
-            turboTimer = Config.turboTime;
+            turboDuration = Config.turboTime * FishShop.Active.TurboTimeMultiplier;
+            turboTimer = turboDuration;
             GameEvents.OnTurboStart?.Invoke();
         }
 

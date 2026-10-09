@@ -124,6 +124,7 @@ namespace Upstream.Audio
             GameEvents.OnGrowthStageChanged += HandleGrowthStageChanged;
             GameEvents.OnCoinCollected += HandleCoinCollected;
             GameEvents.OnWaveHit += HandleWaveHit;
+            GameEvents.OnShieldBlocked += HandleShieldBlocked;
         }
 
         private void OnDisable()
@@ -137,6 +138,7 @@ namespace Upstream.Audio
             GameEvents.OnGrowthStageChanged -= HandleGrowthStageChanged;
             GameEvents.OnCoinCollected -= HandleCoinCollected;
             GameEvents.OnWaveHit -= HandleWaveHit;
+            GameEvents.OnShieldBlocked -= HandleShieldBlocked;
         }
 
         public void PlaySFX(AudioClip clip, float pitch = 1f)
@@ -224,6 +226,13 @@ namespace Upstream.Audio
         {
             PlaySFX(hurt, 0.6f);
             Vibrate(30);
+        }
+
+        // Shield pop: a bright high chime instead of the hurt sound
+        private void HandleShieldBlocked(int chargesLeft)
+        {
+            PlaySFX(eatGoldFood, 1.35f);
+            Vibrate(25);
         }
 
         private void HandleFoodEaten(bool isGold)

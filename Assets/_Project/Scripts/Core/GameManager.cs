@@ -138,6 +138,7 @@ namespace Upstream.Core
             save.totalGamesPlayed++;
             SaveSystem.Save(save);
 
+            FishShop.RefreshActive(); // abilities of the fish worn this run
             GameEvents.OnGameStart?.Invoke();
         }
 

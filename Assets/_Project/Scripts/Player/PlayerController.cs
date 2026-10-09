@@ -124,7 +124,8 @@ namespace Upstream.Player
             float limit = Mathf.Max(20f, Config.riverHalfWidth - currentRadius - 4f);
             float previousX = transform.position.x;
 
-            float newX = Mathf.Lerp(previousX, targetX, Mathf.Min(1f, Config.playerMoveSmoothing * Time.deltaTime));
+            float steering = Config.playerMoveSmoothing * FishShop.Active.SteeringMultiplier;
+            float newX = Mathf.Lerp(previousX, targetX, Mathf.Min(1f, steering * Time.deltaTime));
             newX = Mathf.Clamp(newX, -limit, limit);
 
             transform.position = new Vector3(newX, DefaultPlayerY, 0f);

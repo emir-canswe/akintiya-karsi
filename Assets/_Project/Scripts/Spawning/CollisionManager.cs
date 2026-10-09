@@ -27,8 +27,6 @@ namespace Upstream.Spawning
         [SerializeField] private GameConfig gameConfig;
         [SerializeField] private GrowthConfig growthConfig;
 
-        // Shark body hit-circles along its length (scaled for large sharks). Static: no per-frame allocation.
-        private static readonly float[] SharkPartOffsets = { -16f, 4f, 24f };
 
         public void Configure(
             SpawnManager spawner,
@@ -64,7 +62,9 @@ namespace Upstream.Spawning
             Vector2 playerPos = playerTransform.position;
             float baseRadius = gameConfig != null ? gameConfig.playerRadius : 14f;
             float hitboxMult = growthSystem != null ? growthSystem.HitboxMultiplier : 1f;
-            float pRadius = baseRadius * hitboxMult;
+            FishDef fish = FishShop.Active;
+            float pRadius = baseRadius * hitboxMult * fish.HitboxMultiplier;
+            float magnet = fish.MagnetRadius;
             bool isTurbo = turboSystem != null && turboSystem.IsTurboActive;
 
             var entities = spawnManager.ActiveEntities;
@@ -79,6 +79,7 @@ namespace Upstream.Spawning
                 switch (entity.Type)
                 {
                     case EntityType.Food:
+                        if (magnet > 0f && Vector2.Distance(playerPos, ePos) < pRadius + magnet) entity.Attract(playerPos, Time.deltaTime);
                         if (Vector2.Distance(playerPos, ePos) < (pRadius + 14f))
                         {
                             ((FoodPickup)entity).Collect();
@@ -86,6 +87,7 @@ namespace Upstream.Spawning
                         break;
 
                     case EntityType.Coin:
+                        if (magnet > 0f && Vector2.Distance(playerPos, ePos) < pRadius + magnet) entity.Attract(playerPos, Time.deltaTime);
                         if (Vector2.Distance(playerPos, ePos) < (pRadius + 13f))
                         {
                             ((CoinPickup)entity).Collect();
@@ -93,6 +95,7 @@ namespace Upstream.Spawning
                         break;
 
                     case EntityType.GoldFood:
+                        if (magnet > 0f && Vector2.Distance(playerPos, ePos) < pRadius + magnet) entity.Attract(playerPos, Time.deltaTime);
                         if (Vector2.Distance(playerPos, ePos) < (pRadius + 16f))
                         {
                             ((GoldFoodPickup)entity).Collect();
@@ -103,9 +106,10 @@ namespace Upstream.Spawning
                         var rock = (RockObstacle)entity;
                         if (Vector2.Distance(playerPos, ePos) < (pRadius + rock.radius - 4f))
                         {
-                            if (isTurbo)
+                            if (isTurbo || fish.Has(FishAbility.RockBreaker))
                             {
                                 rock.Smash(playerPos.x);
+                                if (!isTurbo) gameCamera?.Shake(3f);
                             }
                             else if (rock.isSmall && growthSystem != null &&
                                      growthSystem.CurrentStageData != null &&
@@ -128,12 +132,15 @@ namespace Upstream.Spawning
 
                     case EntityType.Shark:
                         var sh = (SharkEnemy)entity;
-                        float sharkScale = sh.isLarge ? 1.4f : 1f;
+                        float sharkScale = sh.HitScale;
+                        float[] parts = sh.HitOffsets;
+                        float partRadius = sh.HitRadius * sharkScale;
                         bool sharkHit = false;
-                        for (int k = 0; k < SharkPartOffsets.Length; k++)
+                        for (int k = 0; k < parts.Length; k++)
                         {
-                            Vector2 partPos = ePos + new Vector2(0f, SharkPartOffsets[k] * sharkScale);
-                            if (Vector2.Distance(playerPos, partPos) < (pRadius + 16f * sharkScale))
+                            // Follow the body's heading so a turning predator is hit where it's drawn
+                            Vector2 partPos = ePos + (Vector2)(sh.transform.rotation * new Vector3(0f, parts[k] * sharkScale, 0f));
+                            if (Vector2.Distance(playerPos, partPos) < (pRadius + partRadius))
                             {
                                 sharkHit = true;
                                 break;
@@ -211,13 +218,14 @@ namespace Upstream.Spawning
                     case EntityType.Wave:
                         var wave = (WaveObstacle)entity;
                         if (wave.spent) break;
+                        bool waveRider = fish.Has(FishAbility.WaveRider);
                         float halfW = wave.width * 0.5f;
                         float wx = Mathf.Clamp(playerPos.x, ePos.x - halfW, ePos.x + halfW);
                         float wy = Mathf.Clamp(playerPos.y, ePos.y - WaveObstacle.Height * 0.5f, ePos.y + WaveObstacle.Height * 0.5f);
                         if (Vector2.Distance(playerPos, new Vector2(wx, wy)) < pRadius)
                         {
                             wave.Spend();
-                            if (!isTurbo)
+                            if (!isTurbo && !waveRider)
                             {
                                 // Not damage: the wave pushes back and the river slows for a moment.
                                 riverController?.ApplySlowdown(1.6f);
@@ -233,7 +241,7 @@ namespace Upstream.Spawning
                         Vector2 hookPos = new Vector2(hook.CurrentX, ePos.y);
                         if (Vector2.Distance(playerPos, hookPos) < (pRadius + 9f))
                         {
-                            if (isTurbo)
+                            if (isTurbo || fish.Has(FishAbility.HookProof))
                             {
                                 hook.Smash(playerPos.x);
                             }
