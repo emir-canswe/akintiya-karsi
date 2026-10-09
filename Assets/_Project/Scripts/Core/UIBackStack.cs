@@ -11,6 +11,9 @@ namespace Upstream.Core
     {
         private static readonly List<Action> Stack = new List<Action>();
 
+        /// <summary>A full-screen overlay (the test ad) is up: the back button does nothing until it closes.</summary>
+        public static bool Blocked { get; set; }
+
         public static void Push(Action close)
         {
             Stack.Remove(close);

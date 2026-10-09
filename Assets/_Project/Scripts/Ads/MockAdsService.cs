@@ -3,6 +3,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Upstream.Core;
 
 namespace Upstream.Ads
 {
@@ -54,11 +55,18 @@ namespace Upstream.Ads
         private IEnumerator ShowAdRoutine(string text, float duration, Action onComplete)
         {
             showing = true;
+            UIBackStack.Blocked = true; // a real full-screen ad swallows the back button too
             ShowOverlay(text);
             yield return new WaitForSecondsRealtime(duration);
             HideOverlay();
             showing = false;
+            UIBackStack.Blocked = false;
             onComplete?.Invoke();
+        }
+
+        private void OnDisable()
+        {
+            if (showing) UIBackStack.Blocked = false;
         }
 
         private void ShowOverlay(string text)

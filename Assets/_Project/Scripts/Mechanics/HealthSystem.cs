@@ -120,6 +120,8 @@ namespace Upstream.Mechanics
 
         public bool TakeDamage()
         {
+            // Already dead: a second hazard touched in the same frame must not hurt (sound/vibration) again.
+            if (currentHP <= 0) return false;
             if (IsInvincible) return false;
             if (Turbo != null && Turbo.IsTurboActive) return false;
 

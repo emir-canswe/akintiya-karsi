@@ -70,6 +70,9 @@ namespace Upstream.Spawning
             var entities = spawnManager.ActiveEntities;
             for (int i = 0; i < entities.Count; i++)
             {
+                // The fish may have died on an earlier entity this frame: nothing more to collect or hit.
+                if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameState.Playing) break;
+
                 var entity = entities[i];
                 if (entity == null || !entity.isActive || entity.isFlying) continue;
 

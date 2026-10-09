@@ -40,6 +40,15 @@ namespace Upstream.Core
             lock (fileLock)
             {
                 SaveData data = new SaveData { version = CurrentVersion };
+
+                // Killed between deleting the old file and moving the new one in: the finished temp file is the save.
+                string tmpPath = SavePath + ".tmp";
+                if (!File.Exists(SavePath) && File.Exists(tmpPath))
+                {
+                    try { File.Move(tmpPath, SavePath); }
+                    catch (Exception e) { Debug.LogError($"Failed to recover save file: {e.Message}"); }
+                }
+
                 if (File.Exists(SavePath))
                 {
                     try

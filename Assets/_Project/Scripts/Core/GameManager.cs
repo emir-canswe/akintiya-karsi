@@ -75,7 +75,7 @@ namespace Upstream.Core
 
         private void HandleSharkEaten()
         {
-            sharksEatenThisRun++;
+            if (CurrentState == GameState.Playing) sharksEatenThisRun++;
             HandleCoinCollected(FishShop.SharkCoins);
         }
 
@@ -92,6 +92,7 @@ namespace Upstream.Core
         {
             // Android back button arrives as Escape in the Input System.
             if (Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
+            if (UIBackStack.Blocked) return; // an ad is playing; leaving now would start a run when it ends
             if (UIBackStack.TryPop()) return; // close the open shop/settings panel first
 
             switch (CurrentState)

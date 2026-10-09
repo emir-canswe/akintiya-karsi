@@ -6,7 +6,7 @@ namespace Upstream.Data
     public class GameConfig : ScriptableObject
     {
         [Header("Player")]
-        public float startSpeed = 160f;
+        public float startSpeed = 120f;
         /// <summary>Speed the distance curve eases toward (see DifficultyScaler.SpeedForDistance).</summary>
         public float maxSpeed = 420f;
         public float playerMoveSmoothing = 12f;

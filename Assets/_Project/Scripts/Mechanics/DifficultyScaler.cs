@@ -32,18 +32,22 @@ namespace Upstream.Mechanics
             return start + (1f - start) * CalculateDifficulty(distance, Config.difficultyRampDistance);
         }
 
-        /// <summary>Extra river speed per meter once the main curve has flattened (keeps long runs getting harder).</summary>
-        public const float LateSpeedPerMeter = 0.03f;
+        /// <summary>Meters between two speed-ups.</summary>
+        public const float SpeedStepMeters = 250f;
+        /// <summary>River speed added at every step (about 6% of the start speed).</summary>
+        public const float SpeedStep = 15f;
 
         /// <summary>
-        /// River speed for the distance swum: rises quickly at first, eases toward <paramref name="maxSpeed"/>,
-        /// then keeps creeping up so there's never a plateau (capped at 1.35x max).
+        /// River speed for the distance swum: a small step up every <see cref="SpeedStepMeters"/>, reaching
+        /// <paramref name="maxSpeed"/> after a few minutes; past it the steps get a third as big (capped at 1.2x max)
+        /// so long runs still get harder.
         /// </summary>
         public static float SpeedForDistance(float meters, float startSpeed, float maxSpeed)
         {
-            meters = Mathf.Max(0f, meters);
-            float curve = (maxSpeed - startSpeed) * (1f - Mathf.Exp(-meters / 800f));
-            return Mathf.Min(startSpeed + curve + meters * LateSpeedPerMeter, maxSpeed * 1.35f);
+            float steps = Mathf.Floor(Mathf.Max(0f, meters) / SpeedStepMeters);
+            float speed = startSpeed + steps * SpeedStep;
+            if (speed > maxSpeed) speed = maxSpeed + (speed - maxSpeed) / 3f;
+            return Mathf.Min(speed, maxSpeed * 1.2f);
         }
 
         /// <summary>

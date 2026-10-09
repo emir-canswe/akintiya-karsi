@@ -92,17 +92,22 @@ namespace Upstream.Tests
         // --- Difficulty / regions ---
 
         [Test]
-        public void SpeedForDistance_StartsAtStart_AndNeverPlateaus()
+        public void SpeedForDistance_RisesInSmallSteps_AndKeepsRisingPastMax()
         {
-            Assert.AreEqual(160f, DifficultyScaler.SpeedForDistance(0f, 160f, 420f), 1e-3f);
-            float prev = 0f;
-            foreach (float m in new[] { 0f, 100f, 500f, 1000f, 2000f, 3000f })
+            Assert.AreEqual(120f, DifficultyScaler.SpeedForDistance(0f, 120f, 420f), 1e-3f);
+            Assert.AreEqual(120f, DifficultyScaler.SpeedForDistance(DifficultyScaler.SpeedStepMeters - 1f, 120f, 420f), 1e-3f,
+                "no speed-up before the first step");
+
+            float prev = DifficultyScaler.SpeedForDistance(0f, 120f, 420f);
+            for (float m = DifficultyScaler.SpeedStepMeters; m <= 8000f; m += DifficultyScaler.SpeedStepMeters)
             {
-                float v = DifficultyScaler.SpeedForDistance(m, 160f, 420f);
-                Assert.Greater(v, prev, $"speed must keep rising at {m} m");
+                float v = DifficultyScaler.SpeedForDistance(m, 120f, 420f);
+                Assert.Greater(v, prev, $"speed must step up at {m} m");
+                Assert.LessOrEqual(v - prev, DifficultyScaler.SpeedStep + 1e-3f, "steps stay small");
                 prev = v;
             }
-            Assert.LessOrEqual(DifficultyScaler.SpeedForDistance(1e6f, 160f, 420f), 420f * 1.35f + 1e-3f, "capped");
+            Assert.Less(DifficultyScaler.SpeedForDistance(1000f, 120f, 420f), 200f, "still gentle after 1 km");
+            Assert.LessOrEqual(DifficultyScaler.SpeedForDistance(1e6f, 120f, 420f), 420f * 1.2f + 1e-3f, "capped");
         }
 
         [Test]

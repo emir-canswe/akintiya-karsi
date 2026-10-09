@@ -246,7 +246,8 @@ namespace Upstream.UI
                 AdsManager.Instance.ShowInterstitialIfDueThen(() =>
                 {
                     waitingForAd = false;
-                    GameManager.Instance.StartGame();
+                    // Only if the player is still on this screen (not sent to the menu meanwhile).
+                    if (GameManager.Instance.CurrentState == GameState.GameOver) GameManager.Instance.StartGame();
                 });
             }
             else
