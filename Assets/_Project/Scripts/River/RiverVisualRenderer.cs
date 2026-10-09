@@ -1,4 +1,5 @@
 using UnityEngine;
+using Upstream.Camera;
 using Upstream.Core;
 using Upstream.Data;
 
@@ -74,19 +75,21 @@ namespace Upstream.River
         {
             float rw = gameConfig != null ? gameConfig.riverHalfWidth : 150f;
             Sprite white = WatercolorSpriteFactory.GetWhiteSprite();
+            // Tall enough for the fitted camera view (taller on narrow phones) plus shake/zoom margin.
+            float quadH = GameCamera.ViewHalfHeight * 2f + 150f;
 
             // Water background layers
-            waterLeftRenderer = CreateQuad("WaterLeft", new Vector3(-rw * 0.5f, 0f, 5f), new Vector3(rw, 750f, 1f), new Color(0.11f, 0.49f, 0.60f), -20, white);
-            waterRightRenderer = CreateQuad("WaterRight", new Vector3(rw * 0.5f, 0f, 5f), new Vector3(rw, 750f, 1f), new Color(0.11f, 0.49f, 0.60f), -20, white);
-            waterCenterRenderer = CreateQuad("WaterCenter", new Vector3(0f, 0f, 4.9f), new Vector3(rw * 1.15f, 750f, 1f), new Color(0.16f, 0.64f, 0.77f), -19, white);
+            waterLeftRenderer = CreateQuad("WaterLeft", new Vector3(-rw * 0.5f, 0f, 5f), new Vector3(rw, quadH, 1f), new Color(0.11f, 0.49f, 0.60f), -20, white);
+            waterRightRenderer = CreateQuad("WaterRight", new Vector3(rw * 0.5f, 0f, 5f), new Vector3(rw, quadH, 1f), new Color(0.11f, 0.49f, 0.60f), -20, white);
+            waterCenterRenderer = CreateQuad("WaterCenter", new Vector3(0f, 0f, 4.9f), new Vector3(rw * 1.15f, quadH, 1f), new Color(0.16f, 0.64f, 0.77f), -19, white);
 
             // Sand & Grass riverbanks
             float bankWidth = 220f;
-            leftSandRenderer = CreateQuad("LeftSand", new Vector3(-rw - bankWidth * 0.5f, 0f, 2f), new Vector3(bankWidth, 750f, 1f), new Color(0.89f, 0.79f, 0.56f), -5, white);
-            rightSandRenderer = CreateQuad("RightSand", new Vector3(rw + bankWidth * 0.5f, 0f, 2f), new Vector3(bankWidth, 750f, 1f), new Color(0.89f, 0.79f, 0.56f), -5, white);
+            leftSandRenderer = CreateQuad("LeftSand", new Vector3(-rw - bankWidth * 0.5f, 0f, 2f), new Vector3(bankWidth, quadH, 1f), new Color(0.89f, 0.79f, 0.56f), -5, white);
+            rightSandRenderer = CreateQuad("RightSand", new Vector3(rw + bankWidth * 0.5f, 0f, 2f), new Vector3(bankWidth, quadH, 1f), new Color(0.89f, 0.79f, 0.56f), -5, white);
 
-            leftGrassRenderer = CreateQuad("LeftGrass", new Vector3(-rw - 16f - bankWidth * 0.5f, 0f, 1.9f), new Vector3(bankWidth, 750f, 1f), new Color(0.35f, 0.64f, 0.35f), -4, white);
-            rightGrassRenderer = CreateQuad("RightGrass", new Vector3(rw + 16f + bankWidth * 0.5f, 0f, 1.9f), new Vector3(bankWidth, 750f, 1f), new Color(0.35f, 0.64f, 0.35f), -4, white);
+            leftGrassRenderer = CreateQuad("LeftGrass", new Vector3(-rw - 16f - bankWidth * 0.5f, 0f, 1.9f), new Vector3(bankWidth, quadH, 1f), new Color(0.35f, 0.64f, 0.35f), -4, white);
+            rightGrassRenderer = CreateQuad("RightGrass", new Vector3(rw + 16f + bankWidth * 0.5f, 0f, 1.9f), new Vector3(bankWidth, quadH, 1f), new Color(0.35f, 0.64f, 0.35f), -4, white);
 
             // 18 Scrolling current streaks
             currentStreaks = new Transform[18];
@@ -240,19 +243,20 @@ namespace Upstream.River
                 waterRightRenderer.color = Color.Lerp(waterRightRenderer.color, reg.waterColor2, Time.deltaTime * 2f);
             }
 
-            // Animate current streaks scrolling top (+340) to bottom (-340)
-            float spanY = 680f;
+            // Animate current streaks scrolling from just above the view to just below it
+            float viewH = GameCamera.ViewHalfHeight;
+            float spanY = (viewH + 40f) * 2f;
             for (int i = 0; i < currentStreaks.Length; i++)
             {
                 float x = -rw + 18f + ((i * 53f) % ((rw - 18f) * 2f));
                 float rawY = (i * 97f - scroll * 1.1f) % spanY;
                 if (rawY < 0f) rawY += spanY;
-                float y = rawY - 340f;
+                float y = rawY - (viewH + 40f);
                 currentStreaks[i].localPosition = new Vector3(x + Mathf.Sin(i + Time.time * 2f) * 3f, y, 0f);
             }
 
             // Animate bank decorations scrolling downward
-            float seg = 44f;
+            float seg = Mathf.Max(44f, (viewH * 2f + 100f) / 16f);
             float decoSpan = 16 * seg;
             for (int idx = 0; idx < bankDecos.Length; idx++)
             {
@@ -260,7 +264,7 @@ namespace Upstream.River
                 int i = bankDecoIndices[idx];
                 float rawY = (i * seg - scroll) % decoSpan;
                 if (rawY < 0f) rawY += decoSpan;
-                float y = rawY - 350f;
+                float y = rawY - (viewH + 50f);
                 float off = Hash01(i, side, 2) * 28f;
                 float x = side * (rw + 26f + off);
                 bankDecos[idx].localPosition = new Vector3(x, y, 0f);

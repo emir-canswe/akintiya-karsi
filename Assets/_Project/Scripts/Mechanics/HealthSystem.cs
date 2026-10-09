@@ -11,6 +11,9 @@ namespace Upstream.Mechanics
     {
         [SerializeField] private GameConfig config;
 
+        private const float GoldOverflowPowerFoods = 3f;
+        private const float ResumeGraceSeconds = 1f;
+
         private int currentHP = 3;
         private float invincibilityTimer;
         private TurboSystem turboSystem;
@@ -34,9 +37,18 @@ namespace Upstream.Mechanics
         public bool IsInvincible => invincibilityTimer > 0f;
         public int MaxHP => Config.maxHP;
 
+        // Resolved lazily: the bootstrap adds TurboSystem after HealthSystem, so it doesn't exist yet in Awake.
+        private TurboSystem Turbo
+        {
+            get
+            {
+                if (turboSystem == null) turboSystem = GetComponent<TurboSystem>();
+                return turboSystem;
+            }
+        }
+
         private void Awake()
         {
-            turboSystem = GetComponent<TurboSystem>();
             currentHP = Config.maxHP;
         }
 
@@ -45,6 +57,7 @@ namespace Upstream.Mechanics
             GameEvents.OnGameStart += ResetHealth;
             GameEvents.OnFoodEaten += HandleFoodEaten;
             GameEvents.OnContinueUsed += HandleContinueUsed;
+            GameEvents.OnGameResume += HandleGameResume;
         }
 
         private void OnDisable()
@@ -52,6 +65,7 @@ namespace Upstream.Mechanics
             GameEvents.OnGameStart -= ResetHealth;
             GameEvents.OnFoodEaten -= HandleFoodEaten;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
+            GameEvents.OnGameResume -= HandleGameResume;
         }
 
         private void Update()
@@ -64,31 +78,45 @@ namespace Upstream.Mechanics
 
         private void HandleFoodEaten(bool isGold)
         {
-            if (isGold)
+            if (!isGold) return;
+
+            bool healed = Heal(1);
+            if (!healed && Turbo != null)
             {
-                Heal(1);
+                // Full health: the rare gold shrimp shouldn't be wasted, turn it into a big power boost.
+                Turbo.AddPower(Config.powerPerFood * GoldOverflowPowerFoods);
             }
+            GameEvents.OnGoldFoodResolved?.Invoke(healed);
+        }
+
+        private void HandleGameResume()
+        {
+            // Short grace period after un-pausing so the player can re-orient.
+            SetInvincible(ResumeGraceSeconds);
         }
 
         private void HandleContinueUsed()
         {
-            currentHP = Config.continueHP;
+            currentHP = Mathf.Clamp(Config.continueHP, 1, Config.maxHP);
             SetInvincible(Config.continueInvincibility);
+            GameEvents.OnHealthChanged?.Invoke(currentHP);
         }
 
         public void ResetHealth()
         {
             currentHP = Config.maxHP;
             invincibilityTimer = 0f;
+            GameEvents.OnHealthChanged?.Invoke(currentHP);
         }
 
         public bool TakeDamage()
         {
             if (IsInvincible) return false;
-            if (turboSystem != null && turboSystem.IsTurboActive) return false;
+            if (Turbo != null && Turbo.IsTurboActive) return false;
 
             currentHP = Mathf.Max(0, currentHP - 1);
             GameEvents.OnPlayerHurt?.Invoke(currentHP);
+            GameEvents.OnHealthChanged?.Invoke(currentHP);
 
             if (currentHP <= 0)
             {
@@ -109,11 +137,13 @@ namespace Upstream.Mechanics
             return true;
         }
 
-        public void Heal(int amount)
+        /// <summary>Returns true if any HP was actually restored.</summary>
+        public bool Heal(int amount)
         {
-            if (currentHP >= Config.maxHP) return;
+            if (amount <= 0 || currentHP <= 0 || currentHP >= Config.maxHP) return false;
             currentHP = Mathf.Min(currentHP + amount, Config.maxHP);
-            GameEvents.OnPlayerHurt?.Invoke(currentHP);
+            GameEvents.OnHealthChanged?.Invoke(currentHP);
+            return true;
         }
 
         public void SetInvincible(float duration)

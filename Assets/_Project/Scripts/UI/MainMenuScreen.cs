@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.EnhancedTouch;
-using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
+using UnityEngine.UI;
 using TMPro;
 using Upstream.Core;
 
@@ -26,16 +25,33 @@ namespace Upstream.UI
             UpdateBestScore();
         }
 
+        private void Awake()
+        {
+            // "Tap anywhere" is a full-screen UI Button on this object, so taps on other UI
+            // (e.g. the sound toggle drawn above it) are consumed by that UI and don't start a run.
+            var tapArea = GetComponent<Button>();
+            if (tapArea != null) tapArea.onClick.AddListener(StartFromMenu);
+        }
+
+        private void StartFromMenu()
+        {
+            if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Menu)
+            {
+                GameManager.Instance.StartGame();
+            }
+        }
+
         private void OnEnable()
         {
-            EnhancedTouchSupport.Enable();
             GameEvents.OnGameStart += HandleGameStart;
+            LocalizationManager.OnLanguageChanged += UpdateBestScore;
             UpdateBestScore();
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= HandleGameStart;
+            LocalizationManager.OnLanguageChanged -= UpdateBestScore;
         }
 
         private void Update()
@@ -49,23 +65,9 @@ namespace Upstream.UI
                     tapToStartText.color = c;
                 }
 
-                bool tapped = false;
-                if (Touch.activeTouches.Count > 0 && Touch.activeTouches[0].phase == UnityEngine.InputSystem.TouchPhase.Began)
+                if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
                 {
-                    tapped = true;
-                }
-                else if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-                {
-                    tapped = true;
-                }
-                else if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
-                {
-                    tapped = true;
-                }
-
-                if (tapped)
-                {
-                    GameManager.Instance.StartGame();
+                    StartFromMenu();
                 }
             }
         }
@@ -75,7 +77,13 @@ namespace Upstream.UI
             var saveData = SaveSystem.Load();
             if (bestScoreText != null)
             {
-                bestScoreText.text = saveData.bestScore > 0 ? $"En iyi: {saveData.bestScore} m" : "";
+                string text = saveData.bestScore > 0 ? LocalizationManager.Format("best_score", saveData.bestScore) : "";
+                if (saveData.unlockedStartStage > 0)
+                {
+                    string stageName = LocalizationManager.Get($"stage_name_{Mathf.Min(saveData.unlockedStartStage, 4)}");
+                    text += (text.Length > 0 ? "\n" : "") + "<size=80%>" + LocalizationManager.Format("start_stage_unlocked", stageName) + "</size>";
+                }
+                bestScoreText.text = text;
             }
         }
 

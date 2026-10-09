@@ -26,20 +26,22 @@ namespace Upstream.Data
         public float maxLogWidthRatio = 0.58f;
         public float logWidthIncreasePerDifficulty = 0.1f;
 
+        // Relative weights (they don't need to sum to 1). Interpolated between Diff 0 and Diff 1.
         [Header("Pattern Weights (Diff 0)")]
-        public float diff0FoodLineWeight = 1f;
-        public float diff0RockWeight = 1f;
-        public float diff0LogWeight = 1f;
-        public float diff0SharkWeight = 1f;
-        public float diff0HookWeight = 1f;
+        public float diff0FoodLineWeight = 0.30f;
+        public float diff0RockWeight = 0.20f;
+        public float diff0LogWeight = 0.16f;
+        public float diff0SharkWeight = 0.18f;
+        public float diff0HookWeight = 0.16f;
 
         [Header("Pattern Weights (Diff 1)")]
-        public float diff1FoodLineWeight = 1f;
-        public float diff1RockWeight = 1f;
-        public float diff1LogWeight = 1f;
-        public float diff1SharkWeight = 1f;
-        public float diff1HookWeight = 1f;
+        public float diff1FoodLineWeight = 0.30f;
+        public float diff1RockWeight = 0.20f;
+        public float diff1LogWeight = 0.16f;
+        public float diff1SharkWeight = 0.24f;
+        public float diff1HookWeight = 0.10f;
 
+        [Header("Growth")]
         public int largeSharksAfterStage = 3;
     }
 }

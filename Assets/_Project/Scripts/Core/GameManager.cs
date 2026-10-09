@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using System.Collections;
 using Upstream.Data;
 
@@ -23,7 +24,20 @@ namespace Upstream.Core
         }
 
         public float CurrentDistance { get; set; }
-        private SaveData saveData;
+
+        /// <summary>Score (meters) of the run that just ended. Valid once OnGameOver fires.</summary>
+        public int LastScore { get; private set; }
+        /// <summary>True if the run that just ended beat the previous best score.</summary>
+        public bool LastRunWasNewBest { get; private set; }
+        public int BestScore { get; private set; }
+        /// <summary>Stage index a new run now starts at, if the run that just ended unlocked it; otherwise -1.</summary>
+        public int LastRunUnlockedStartStage { get; private set; } = -1;
+
+        /// <summary>Needed for the start-stage unlock rule; assigned by the bootstrap.</summary>
+        public GrowthConfig GrowthConfig { get; set; }
+
+        private int sharksEatenThisRun;
+        private int maxStageThisRun;
 
         private void Awake()
         {
@@ -31,7 +45,7 @@ namespace Upstream.Core
             {
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
-                saveData = SaveSystem.Load();
+                BestScore = SaveSystem.Load().bestScore;
                 if (gameConfig == null) gameConfig = ScriptableObject.CreateInstance<GameConfig>();
             }
             else if (Instance != this)
@@ -40,15 +54,66 @@ namespace Upstream.Core
             }
         }
 
+        private void OnEnable()
+        {
+            GameEvents.OnSharkEaten += HandleSharkEaten;
+            GameEvents.OnGrowthStageChanged += HandleStageChanged;
+        }
+
+        private void OnDisable()
+        {
+            GameEvents.OnSharkEaten -= HandleSharkEaten;
+            GameEvents.OnGrowthStageChanged -= HandleStageChanged;
+        }
+
+        private void HandleSharkEaten() => sharksEatenThisRun++;
+        private void HandleStageChanged(int stage) => maxStageThisRun = Mathf.Max(maxStageThisRun, stage);
+
+        private void Update()
+        {
+            // Android back button arrives as Escape in the Input System.
+            if (Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
+
+            switch (CurrentState)
+            {
+                case GameState.Playing: PauseGame(); break;
+                case GameState.Paused: ResumeGame(); break;
+                case GameState.Menu: Application.Quit(); break;
+            }
+        }
+
+        // Leaving the app (home button, call, notification shade) must not keep the run going in the
+        // background: the player would come back to a dead fish.
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused) PauseGame();
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+#if !UNITY_EDITOR
+            if (!hasFocus) PauseGame();
+#endif
+        }
+
         public void StartGame()
         {
             StopAllCoroutines();
             Time.timeScale = 1f;
+            AudioListener.pause = false;
             CurrentDistance = 0f;
+            sharksEatenThisRun = 0;
+            maxStageThisRun = 0; // GrowthSystem re-raises the start stage on OnGameStart
+            LastRunUnlockedStartStage = -1;
             CurrentState = GameState.Playing;
-            if (saveData == null) saveData = SaveSystem.Load();
-            saveData.totalGamesPlayed++;
-            SaveSystem.Save(saveData);
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
+
+            // Always load-modify-save: other systems (sound toggle etc.) write the same file,
+            // so a cached copy here would overwrite their changes.
+            var save = SaveSystem.Load();
+            save.totalGamesPlayed++;
+            SaveSystem.Save(save);
+
             GameEvents.OnGameStart?.Invoke();
         }
 
@@ -58,6 +123,7 @@ namespace Upstream.Core
             {
                 CurrentState = GameState.Paused;
                 Time.timeScale = 0f;
+                AudioListener.pause = true;
                 GameEvents.OnGamePause?.Invoke();
             }
         }
@@ -68,6 +134,7 @@ namespace Upstream.Core
             {
                 CurrentState = GameState.Playing;
                 Time.timeScale = 1f;
+                AudioListener.pause = false;
                 GameEvents.OnGameResume?.Invoke();
             }
         }
@@ -89,29 +156,54 @@ namespace Upstream.Core
             yield return new WaitForSecondsRealtime(animDuration);
 
             CurrentState = GameState.GameOver;
+            Screen.sleepTimeout = SleepTimeout.SystemSetting;
 
-            int score = Mathf.FloorToInt(CurrentDistance / Config.distanceToMetersDivisor);
-            if (saveData == null) saveData = SaveSystem.Load();
-            if (score > saveData.bestScore)
+            int score = Config.distanceToMetersDivisor > 0f
+                ? Mathf.FloorToInt(CurrentDistance / Config.distanceToMetersDivisor)
+                : 0;
+
+            var save = SaveSystem.Load();
+
+            // Single source of truth for the best score. UI reads LastRunWasNewBest instead of
+            // re-comparing against the save file (which would already contain this score).
+            LastScore = score;
+            LastRunWasNewBest = score > 0 && score > save.bestScore;
+            if (LastRunWasNewBest) save.bestScore = score;
+            BestScore = save.bestScore;
+
+            save.totalSharksEaten += sharksEatenThisRun;
+            sharksEatenThisRun = 0;
+
+            // Persistent progression: remember the best stage and report a newly unlocked start stage.
+            LastRunUnlockedStartStage = -1;
+            if (maxStageThisRun > save.bestStageReached)
             {
-                saveData.bestScore = score;
-                SaveSystem.Save(saveData);
+                var growth = GrowthConfig != null ? GrowthConfig : ScriptableObject.CreateInstance<GrowthConfig>();
+                int oldStart = growth.GetStartStage(save.bestStageReached);
+                int newStart = growth.GetStartStage(maxStageThisRun);
+                save.bestStageReached = maxStageThisRun;
+                save.unlockedStartStage = newStart;
+                if (newStart > oldStart) LastRunUnlockedStartStage = newStart;
             }
+            SaveSystem.Save(save);
 
             GameEvents.OnGameOver?.Invoke();
         }
 
+        /// <summary>
+        /// Resumes the run after a rewarded ad. Call ONLY from the ad's reward callback.
+        /// </summary>
         public void ContinueWithAd()
         {
-            if (CurrentState == GameState.GameOver || CurrentState == GameState.Dying)
-            {
-                StopAllCoroutines();
-                Time.timeScale = 1f;
-                int hp = Config.continueHP;
-                CurrentState = GameState.Playing;
-                GameEvents.OnContinueUsed?.Invoke();
-                GameEvents.OnPlayerHurt?.Invoke(hp);
-            }
+            if (CurrentState != GameState.GameOver) return;
+
+            StopAllCoroutines();
+            Time.timeScale = 1f;
+            AudioListener.pause = false;
+            CurrentState = GameState.Playing;
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;
+            // HealthSystem restores HP and raises OnHealthChanged itself.
+            GameEvents.OnContinueUsed?.Invoke();
         }
     }
 }

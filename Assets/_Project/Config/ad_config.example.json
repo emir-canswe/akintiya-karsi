@@ -3,5 +3,5 @@
   "android_interstitial_id": "ca-app-pub-3940256099942544/1033173712",
   "ios_rewarded_id": "ca-app-pub-3940256099942544/1712485313",
   "ios_interstitial_id": "ca-app-pub-3940256099942544/4411468910",
-  "NOTE": "Replace these test IDs with your real AdMob IDs. Copy this file as ad_config.json (which is gitignored)."
+  "NOTE": "These are Google's official TEST ids. For release: copy this file to Assets/Resources/ad_config.json (gitignored) and put your real ad unit ids there. Never commit the real file."
 }

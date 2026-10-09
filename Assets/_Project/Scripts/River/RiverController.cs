@@ -47,9 +47,9 @@ namespace Upstream.River
 
         public float FlowSpeed => GetFlowSpeed();
         public float ScrollOffset => scrollOffset;
-        public RegionData ActiveRegion => scaler != null && GameManager.Instance != null
-            ? scaler.GetCurrentRegion(GameManager.Instance.CurrentDistance)
-            : (DiffConfig.regions != null && DiffConfig.regions.Length > 0 ? DiffConfig.regions[0] : null);
+        public RegionData ActiveRegion => DifficultyScaler.FindRegion(
+            DiffConfig.regions,
+            GameManager.Instance != null ? GameManager.Instance.CurrentDistance : 0f);
 
         private void Awake()
         {

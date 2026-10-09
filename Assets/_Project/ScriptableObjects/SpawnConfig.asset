@@ -25,14 +25,14 @@ MonoBehaviour:
   minLogWidthRatio: 0.42
   maxLogWidthRatio: 0.58
   logWidthIncreasePerDifficulty: 0.1
-  diff0FoodLineWeight: 1
-  diff0RockWeight: 1
-  diff0LogWeight: 1
-  diff0SharkWeight: 1
-  diff0HookWeight: 1
-  diff1FoodLineWeight: 1
-  diff1RockWeight: 1
-  diff1LogWeight: 1
-  diff1SharkWeight: 1
-  diff1HookWeight: 1
+  diff0FoodLineWeight: 0.3
+  diff0RockWeight: 0.2
+  diff0LogWeight: 0.16
+  diff0SharkWeight: 0.18
+  diff0HookWeight: 0.16
+  diff1FoodLineWeight: 0.3
+  diff1RockWeight: 0.2
+  diff1LogWeight: 0.16
+  diff1SharkWeight: 0.24
+  diff1HookWeight: 0.1
   largeSharksAfterStage: 3

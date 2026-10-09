@@ -1,4 +1,5 @@
 using UnityEngine;
+using Upstream.Camera;
 
 namespace Upstream.Entities
 {
@@ -53,7 +54,7 @@ namespace Upstream.Entities
                 if (!isFlying)
                 {
                     fishingLine.positionCount = 2;
-                    fishingLine.SetPosition(0, new Vector3(startX, 340f, 0.1f));
+                    fishingLine.SetPosition(0, new Vector3(startX, GameCamera.ViewHalfHeight + 40f, 0.1f));
                     fishingLine.SetPosition(1, new Vector3(cachedTransform.position.x, cachedTransform.position.y + 12f, 0.1f));
                 }
             }

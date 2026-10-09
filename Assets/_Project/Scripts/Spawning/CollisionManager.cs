@@ -27,6 +27,9 @@ namespace Upstream.Spawning
         [SerializeField] private GameConfig gameConfig;
         [SerializeField] private GrowthConfig growthConfig;
 
+        // Shark body hit-circles along its length (scaled for large sharks). Static: no per-frame allocation.
+        private static readonly float[] SharkPartOffsets = { -16f, 4f, 24f };
+
         public void Configure(
             SpawnManager spawner,
             Transform player,
@@ -120,10 +123,9 @@ namespace Upstream.Spawning
                         var sh = (SharkEnemy)entity;
                         float sharkScale = sh.isLarge ? 1.4f : 1f;
                         bool sharkHit = false;
-                        float[] offsets = { -16f * sharkScale, 4f * sharkScale, 24f * sharkScale };
-                        for (int k = 0; k < offsets.Length; k++)
+                        for (int k = 0; k < SharkPartOffsets.Length; k++)
                         {
-                            Vector2 partPos = ePos + new Vector2(0f, offsets[k]);
+                            Vector2 partPos = ePos + new Vector2(0f, SharkPartOffsets[k] * sharkScale);
                             if (Vector2.Distance(playerPos, partPos) < (pRadius + 16f * sharkScale))
                             {
                                 sharkHit = true;
@@ -150,7 +152,11 @@ namespace Upstream.Spawning
                                 gameCamera?.BulletTime(btScale, btDur);
                                 gameCamera?.ZoomIn(zoomAmt, 0.22f);
                                 gameCamera?.Shake(12f);
-                                toastUI?.Show("+50m YUTTUN!", new Color(1f, 0.54f, 0.36f));
+                                float divisor = gameConfig != null && gameConfig.distanceToMetersDivisor > 0f
+                                    ? gameConfig.distanceToMetersDivisor
+                                    : 10f;
+                                int bonusMeters = Mathf.RoundToInt(bonus / divisor);
+                                toastUI?.Show(LocalizationManager.Format("devour_toast", bonusMeters), new Color(1f, 0.54f, 0.36f));
                             }
                             else if (isTurbo)
                             {

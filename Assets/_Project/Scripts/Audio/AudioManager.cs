@@ -11,6 +11,9 @@ namespace Upstream.Audio
     {
         public static AudioManager Instance { get; private set; }
 
+        /// <summary>Raised when sound or vibration settings change (keeps every toggle label in sync).</summary>
+        public static event System.Action OnSettingsChanged;
+
         [Header("Audio Sources")]
         [SerializeField] private AudioSource ambientSource;
         [SerializeField] private AudioSource[] sfxSources;
@@ -30,8 +33,10 @@ namespace Upstream.Audio
         private AudioSource turboSource;
         private TurboSystem turboSystem;
         private bool isMuted;
+        private bool vibrationOn = true;
 
         public bool IsMuted => isMuted;
+        public bool IsVibrationOn => vibrationOn;
 
         public void SetClips(
             AudioClip eat,
@@ -97,6 +102,7 @@ namespace Upstream.Audio
         private void Start()
         {
             var saveData = SaveSystem.Load();
+            vibrationOn = saveData.settingsVibrationOn;
             SetMuted(!saveData.settingsSoundOn);
 
             if (ambientWater != null && !ambientSource.isPlaying)
@@ -172,11 +178,22 @@ namespace Upstream.Audio
         {
             isMuted = muted;
             AudioListener.volume = muted ? 0f : 1f;
+            OnSettingsChanged?.Invoke();
+        }
+
+        public void SetVibration(bool on)
+        {
+            vibrationOn = on;
+            var saveData = SaveSystem.Load();
+            saveData.settingsVibrationOn = on;
+            SaveSystem.Save(saveData);
+            OnSettingsChanged?.Invoke();
         }
 
         public void Vibrate(int milliseconds)
         {
-            if (isMuted) return;
+            // Vibration has its own setting; muting sound shouldn't silently kill haptics.
+            if (!vibrationOn) return;
 
 #if UNITY_ANDROID && !UNITY_EDITOR
             try

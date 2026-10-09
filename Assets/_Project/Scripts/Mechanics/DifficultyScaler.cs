@@ -1,6 +1,5 @@
 using UnityEngine;
 using Upstream.Data;
-using System.Reflection;
 
 namespace Upstream.Mechanics
 {
@@ -9,19 +8,19 @@ namespace Upstream.Mechanics
     /// </summary>
     public class DifficultyScaler : MonoBehaviour
     {
+        /// <summary>Ramp distance used when no DifficultyConfig is assigned.</summary>
+        public const float DefaultRampDistance = 5000f;
+
         [SerializeField] private DifficultyConfig config;
 
-        /// <summary>
-        /// Current difficulty percentage normalized from 0 to 1 based on GameManager's distance.
-        /// </summary>
-        public float DifficultyPercent
+        public DifficultyConfig Config
         {
             get
             {
-                if (config == null || config.difficultyRampDistance <= 0f) return 0f;
-                // Requires GameManager reference or just use GetDifficulty
-                return 0f; 
+                if (config == null) config = ScriptableObject.CreateInstance<DifficultyConfig>();
+                return config;
             }
+            set => config = value;
         }
 
         /// <summary>
@@ -29,8 +28,16 @@ namespace Upstream.Mechanics
         /// </summary>
         public float GetDifficulty(float distance)
         {
-            if (config == null || config.difficultyRampDistance <= 0f) return 0f;
-            return Mathf.Clamp01(distance / config.difficultyRampDistance);
+            return CalculateDifficulty(distance, Config.difficultyRampDistance);
+        }
+
+        /// <summary>
+        /// Pure difficulty curve: linear 0..1 over the ramp distance.
+        /// </summary>
+        public static float CalculateDifficulty(float distance, float rampDistance)
+        {
+            if (rampDistance <= 0f) return 1f;
+            return Mathf.Clamp01(distance / rampDistance);
         }
 
         /// <summary>
@@ -38,31 +45,35 @@ namespace Upstream.Mechanics
         /// </summary>
         public RegionData GetCurrentRegion(float distance)
         {
-            if (config == null || config.regions == null || config.regions.Length == 0) return null;
-
-            RegionData currentRegion = config.regions[0];
-            
-            // Note: Assumes RegionData has a standard field like startDistance for its threshold.
-            // Adjust property reflection or direct field access according to the exact structure.
-            for (int i = 0; i < config.regions.Length; i++)
-            {
-                var region = config.regions[i];
-                float startDist = 0f;
-                
-                FieldInfo field = region.GetType().GetField("startDistance");
-                if (field != null) startDist = (float)field.GetValue(region);
-                
-                if (distance >= startDist)
-                {
-                    currentRegion = region;
-                }
-            }
-
-            return currentRegion;
+            return FindRegion(Config.regions, distance);
         }
 
         /// <summary>
-        /// Calculates the updated base speed using acceleration. 
+        /// Returns the region with the highest startDistance that is &lt;= distance.
+        /// Regions don't need to be sorted.
+        /// </summary>
+        public static RegionData FindRegion(RegionData[] regions, float distance)
+        {
+            if (regions == null || regions.Length == 0) return null;
+
+            RegionData current = null;
+            float bestStart = float.NegativeInfinity;
+            for (int i = 0; i < regions.Length; i++)
+            {
+                var region = regions[i];
+                if (region == null) continue;
+                if (distance >= region.startDistance && region.startDistance >= bestStart)
+                {
+                    bestStart = region.startDistance;
+                    current = region;
+                }
+            }
+
+            return current ?? regions[0];
+        }
+
+        /// <summary>
+        /// Calculates the updated base speed using acceleration.
         /// </summary>
         public float GetCurrentSpeed(float baseSpeed, float maxSpeed, float speedIncrease, float deltaTime)
         {

@@ -37,36 +37,38 @@ namespace Upstream.UI
             turboSystem = turbo;
         }
 
+        // Subscribed in Awake/OnDestroy (not OnEnable/OnDisable) because this HUD hides itself with
+        // SetActive(false). With OnEnable-based subscriptions it would never hear OnGameStart again
+        // and would stay hidden forever.
         private void Awake()
         {
             if (turboSystem == null)
             {
                 turboSystem = FindFirstObjectByType<TurboSystem>();
             }
-        }
 
-        private void OnEnable()
-        {
             GameEvents.OnScoreChanged += HandleScoreChanged;
-            GameEvents.OnPlayerHurt += HandlePlayerHurt;
+            GameEvents.OnHealthChanged += HandleHealthChanged;
             GameEvents.OnTurboStart += HandleTurboStart;
             GameEvents.OnTurboEnd += HandleTurboEnd;
             GameEvents.OnGrowthStageChanged += HandleGrowthStageChanged;
-            GameEvents.OnFoodEaten += HandleFoodEaten;
+            GameEvents.OnGoldFoodResolved += HandleGoldFoodResolved;
             GameEvents.OnGameStart += HandleGameStart;
             GameEvents.OnGameOver += HandleGameOver;
+            GameEvents.OnContinueUsed += HandleContinueUsed;
         }
 
-        private void OnDisable()
+        private void OnDestroy()
         {
             GameEvents.OnScoreChanged -= HandleScoreChanged;
-            GameEvents.OnPlayerHurt -= HandlePlayerHurt;
+            GameEvents.OnHealthChanged -= HandleHealthChanged;
             GameEvents.OnTurboStart -= HandleTurboStart;
             GameEvents.OnTurboEnd -= HandleTurboEnd;
             GameEvents.OnGrowthStageChanged -= HandleGrowthStageChanged;
-            GameEvents.OnFoodEaten -= HandleFoodEaten;
+            GameEvents.OnGoldFoodResolved -= HandleGoldFoodResolved;
             GameEvents.OnGameStart -= HandleGameStart;
             GameEvents.OnGameOver -= HandleGameOver;
+            GameEvents.OnContinueUsed -= HandleContinueUsed;
         }
 
         private void Update()
@@ -89,7 +91,7 @@ namespace Upstream.UI
             }
         }
 
-        private void HandlePlayerHurt(int currentHp)
+        private void HandleHealthChanged(int currentHp)
         {
             UpdateHearts(currentHp);
         }
@@ -111,7 +113,7 @@ namespace Upstream.UI
         private void HandleTurboStart()
         {
             if (turboGlowEffect != null) turboGlowEffect.SetActive(true);
-            if (toastUI != null) toastUI.Show("TURBO!", new Color(0.49f, 0.94f, 0.78f));
+            if (toastUI != null) toastUI.Show(LocalizationManager.Get("turbo_toast"), new Color(0.49f, 0.94f, 0.78f));
         }
 
         private void HandleTurboEnd()
@@ -123,25 +125,22 @@ namespace Upstream.UI
         {
             if (stage > 0 && toastUI != null)
             {
-                string[] names = { "YAVRU", "GENÇ!", "YETİŞKİN!", "ALFA!", "DEV BALIK!" };
-                string label = stage < names.Length ? names[stage] : $"KADEME {stage + 1}!";
-                toastUI.Show(label, new Color(1f, 0.84f, 0.35f));
+                toastUI.Show(LocalizationManager.Get($"stage_up_{Mathf.Min(stage, 4)}"), new Color(1f, 0.84f, 0.35f));
             }
         }
 
-        private void HandleFoodEaten(bool isGold)
+        private void HandleGoldFoodResolved(bool healed)
         {
-            if (isGold && toastUI != null)
-            {
-                toastUI.Show("+1 CAN", new Color(1f, 0.84f, 0.35f));
-            }
+            if (toastUI == null) return;
+            if (healed) toastUI.Show(LocalizationManager.Get("heal_toast"), new Color(1f, 0.84f, 0.35f));
+            else toastUI.Show(LocalizationManager.Get("power_toast"), new Color(0.49f, 0.94f, 0.78f));
         }
 
         private void HandleGameStart()
         {
             gameObject.SetActive(true);
             if (turboGlowEffect != null) turboGlowEffect.SetActive(false);
-            UpdateHearts(3);
+            // Hearts are refreshed by HealthSystem.ResetHealth -> OnHealthChanged.
             if (powerBarFill != null) powerBarFill.fillAmount = 0f;
             if (distanceText != null) distanceText.text = "0<size=50%>m</size>";
         }
@@ -149,6 +148,11 @@ namespace Upstream.UI
         private void HandleGameOver()
         {
             gameObject.SetActive(false);
+        }
+
+        private void HandleContinueUsed()
+        {
+            gameObject.SetActive(true);
         }
     }
 }

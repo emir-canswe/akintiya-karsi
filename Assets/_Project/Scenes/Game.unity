@@ -148,6 +148,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9174bb03dcbc63444a6d7ce727ddd39b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Upstream.Runtime::Upstream.Core.UpstreamGameBootstrap
+  gameConfigAsset: {fileID: 11400000, guid: c4d9bd9fb52b0c640a5251473ba25992, type: 2}
+  growthConfigAsset: {fileID: 11400000, guid: aa159b4b45e388c488652659aa9f0901, type: 2}
+  spawnConfigAsset: {fileID: 11400000, guid: 2f603f756a395f649895fc7d3720ae12, type: 2}
+  difficultyConfigAsset: {fileID: 11400000, guid: 317999af38ccb4242b5c0bc381763e61, type: 2}
 --- !u!4 &724038659
 Transform:
   m_ObjectHideFlags: 0

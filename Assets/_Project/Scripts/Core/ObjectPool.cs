@@ -5,39 +5,35 @@ namespace Upstream.Core
 {
     /// <summary>
     /// A generic object pool for Unity Components with zero runtime GC allocation during gameplay.
+    /// Plain C# class on purpose: Unity can't AddComponent a generic MonoBehaviour
+    /// ("Generic MonoBehaviours are not supported!"), which returned null and aborted the bootstrap.
     /// </summary>
-    public class ObjectPool<T> : MonoBehaviour where T : Component
+    public class ObjectPool<T> where T : Component
     {
-        [SerializeField] private T prefab;
-        [SerializeField] private int initialSize = 12;
-        [SerializeField] private Transform parent;
+        private readonly T prefab;
+        private readonly Transform parent;
+        private readonly Queue<T> pool;
 
-        private readonly Queue<T> pool = new Queue<T>();
-
-        public void Configure(T prefabTemplate, int size = 12, Transform poolParent = null)
+        public ObjectPool(T prefabTemplate, int initialSize, Transform poolParent)
         {
             prefab = prefabTemplate;
-            initialSize = size;
-            parent = poolParent != null ? poolParent : transform;
-            Initialize();
-        }
+            parent = poolParent;
+            pool = new Queue<T>(Mathf.Max(1, initialSize));
 
-        public void Initialize()
-        {
             if (prefab == null) return;
-            if (parent == null) parent = transform;
-            for (int i = pool.Count; i < initialSize; i++)
+            for (int i = 0; i < initialSize; i++)
             {
                 CreateNewObject();
             }
         }
 
-        private T CreateNewObject()
+        public int AvailableCount => pool.Count;
+
+        private void CreateNewObject()
         {
-            T obj = Instantiate(prefab, parent);
+            T obj = Object.Instantiate(prefab, parent);
             obj.gameObject.SetActive(false);
             pool.Enqueue(obj);
-            return obj;
         }
 
         public T Get()
@@ -57,25 +53,6 @@ namespace Upstream.Core
             if (obj == null) return;
             obj.gameObject.SetActive(false);
             pool.Enqueue(obj);
-        }
-    }
-
-    public class ObjectPoolManager : MonoBehaviour
-    {
-        private readonly Dictionary<string, object> pools = new Dictionary<string, object>();
-
-        public void RegisterPool<T>(string name, ObjectPool<T> pool) where T : Component
-        {
-            pools[name] = pool;
-        }
-
-        public ObjectPool<T> GetPool<T>(string name) where T : Component
-        {
-            if (pools.TryGetValue(name, out object pool))
-            {
-                return pool as ObjectPool<T>;
-            }
-            return null;
         }
     }
 }

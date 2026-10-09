@@ -12,14 +12,20 @@ namespace Upstream.Core
         public int totalGamesPlayed;
         public bool settingsSoundOn = true;
         public bool settingsVibrationOn = true;
-        public string settingsLanguage = "en";
+        /// <summary>"" = not chosen yet: the phone language decides on first launch.</summary>
+        public string settingsLanguage = "";
         public int unlockedStartStage;
         public int totalSharksEaten;
+        // v2
+        /// <summary>Highest growth stage index ever reached in any run (drives start-stage unlocks).</summary>
+        public int bestStageReached;
+        /// <summary>Set by the future "Remove Ads" purchase; disables interstitials (rewarded stays opt-in).</summary>
+        public bool adsRemoved;
     }
 
     public static class SaveSystem
     {
-        private const int CurrentVersion = 1;
+        private const int CurrentVersion = 2;
         private static string SavePath => Application.persistentDataPath + "/save.json";
         private static object fileLock = new object();
 
@@ -33,11 +39,15 @@ namespace Upstream.Core
                     try
                     {
                         string json = File.ReadAllText(SavePath);
-                        data = JsonUtility.FromJson<SaveData>(json);
-
-                        if (data.version < CurrentVersion)
+                        // An empty/truncated file makes FromJson return null; fall back to defaults.
+                        var loaded = string.IsNullOrWhiteSpace(json) ? null : JsonUtility.FromJson<SaveData>(json);
+                        if (loaded != null)
                         {
-                            Migrate(data);
+                            data = loaded;
+                            if (data.version < CurrentVersion)
+                            {
+                                Migrate(data);
+                            }
                         }
                     }
                     catch (Exception e)
@@ -55,9 +65,15 @@ namespace Upstream.Core
             {
                 try
                 {
+                    if (data == null) return;
                     data.version = CurrentVersion;
                     string json = JsonUtility.ToJson(data, true);
-                    File.WriteAllText(SavePath, json);
+
+                    // Write to a temp file first so a crash/kill mid-write can't leave a corrupt save.
+                    string tmpPath = SavePath + ".tmp";
+                    File.WriteAllText(tmpPath, json);
+                    if (File.Exists(SavePath)) File.Delete(SavePath);
+                    File.Move(tmpPath, SavePath);
                 }
                 catch (Exception e)
                 {
@@ -84,10 +100,15 @@ namespace Upstream.Core
             }
         }
 
-        private static void Migrate(SaveData data)
+        public static void Migrate(SaveData data)
         {
+            // v1 -> v2: new fields default to 0/false, which is correct for old players.
+            // A v1 player who had already unlocked a start stage keeps it.
+            if (data.version < 2)
+            {
+                data.bestStageReached = Mathf.Max(data.bestStageReached, data.unlockedStartStage);
+            }
             data.version = CurrentVersion;
-            // Add migration logic for older versions if necessary.
         }
     }
 }

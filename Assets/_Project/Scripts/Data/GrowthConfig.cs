@@ -30,9 +30,25 @@ namespace Upstream.Data
             new GrowthStage { stageName = "Titan",  sizeMultiplier = 2.5f, foodRequired = 100, canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = true,  canEatLargeSharks = true,  smallRockImmune = true,  powerBarFillMultiplier = 0.52f, hitboxMultiplier = 2.2f, healOnStageUp = true }
         };
 
+        [Header("Persistent progression")]
+        [Tooltip("Reaching this stage index in any run (3 = Alpha) unlocks a bigger starting fish.")]
+        public int unlockStartStageAtReached = 3;
+        [Tooltip("Stage index new runs start at once unlocked (1 = Young). 0 disables the unlock.")]
+        public int unlockedStartStage = 1;
+
         public int sharkEatBonusDistance = 500;
         public float bulletTimeScale = 0.3f;
         public float bulletTimeDuration = 0.3f;
         public float zoomInAmount = 0.2f;
+
+        /// <summary>
+        /// Pure rule: which stage a new run starts at, given the best stage ever reached.
+        /// </summary>
+        public int GetStartStage(int bestStageReached)
+        {
+            if (stages == null || stages.Length == 0) return 0;
+            int start = bestStageReached >= unlockStartStageAtReached ? unlockedStartStage : 0;
+            return Mathf.Clamp(start, 0, stages.Length - 1);
+        }
     }
 }

@@ -75,3 +75,9 @@ desktop.ini
 
 # Plastic SCM
 *.ignore
+
+# Player builds (APK/AAB)
+/[Bb]uilds/
+
+# Unity temp tools
+/.utmp/

@@ -1,45 +1,64 @@
 # 🐟 Upstream (Akıntıya Karşı)
 
-A mobile river survival game built with **Unity 6 LTS** (URP 2D).
+A one-finger mobile river game built with **Unity 6 LTS** (6000.3, URP 2D).
+Swim upstream, eat shrimp, grow from Fry to Titan, and devour the sharks that once hunted you.
 
-Swim upstream, eat food, grow bigger, and devour the sharks that once hunted you.
+## 🎮 Gameplay
+- **Drag to steer** left and right (keyboard A/D or arrows in the editor)
+- **Eat shrimp** → fill the power bar → **Turbo** smashes rocks and logs
+- **Dodge** sharks, rocks, bank logs and **hooks** (they look like bait)
+- **Grow** through 5 stages: Fry → Young → Adult → Alpha → Titan; big enough and you eat sharks
+- **Gold shrimp** heals a heart (or gives power at full health)
+- Reaching **Alpha** once unlocks starting every run as **Young**
 
-## 🎮 Core Gameplay
-- **Drag to steer** — guide your fish left and right
-- **Eat shrimp** to fill the power bar → **Turbo mode**
-- **Dodge** sharks, rocks, logs, and hooks
-- **Grow** through 5 stages: Fry → Young → Adult → Alpha → Titan
-- At higher stages, **eat the sharks** that used to chase you
+## ▶ Running it
+1. Open the `Upstream` folder in Unity Hub (6000.3.25f1).
+2. Open `Assets/_Project/Scenes/Game.unity` and press Play.
+   The whole game is built at runtime by `UpstreamGameBootstrap`; balance values come from the
+   assets in `Assets/_Project/ScriptableObjects/` (edit them in the Inspector, no code needed).
+
+## 📱 Android build
+The project path contains non-ASCII characters (`akıntiya karşi`), which Unity's Android tools
+reject. Build through the ASCII junction `C:\Users\Msi\UpstreamBuild` (same folder) or rename the folder.
+
+- **Test APK:** menu *Upstream → 3. Build Android APK*, or
+  `Unity.exe -batchmode -quit -projectPath C:/Users/Msi/UpstreamBuild -buildTarget Android -executeMethod Upstream.EditorTools.UpstreamSceneBuilder.BuildAndroidApkCli`
+  then `adb install -r Builds/Upstream.apk`
+- **Play Store AAB:** *Upstream → 4. Build Android AAB* — needs your upload key, see [docs/KEYSTORE.md](docs/KEYSTORE.md)
+- IL2CPP + ARM64, version and icon are applied automatically (`Assets/Editor/ReleaseSettings.cs`).
+
+Close Android Studio / other Gradle builds while building: Unity's Gradle build needs several GB of RAM.
 
 ## 🏗️ Architecture
-| Module | Purpose |
-|--------|---------|
-| `Core` | GameManager, ObjectPool, SaveSystem, Events |
-| `Data` | ScriptableObject configs (balance, growth, spawn, difficulty) |
-| `Player` | Input (touch + keyboard), movement, boundary clamping |
-| `Mechanics` | Growth (5-stage), Turbo, Health, Score, Difficulty |
-| `Entities` | Food, Shark, Rock, Log, Hook — all pooled |
-| `Spawning` | Pattern-based spawning, manual collision (no physics engine) |
-| `UI` | HUD, GameOver, MainMenu, Toast notifications |
-| `Audio` | Pooled AudioSource manager |
-| `Ads` | IAdsService interface, MockAds for testing, AdMob stub |
+| Folder | Purpose |
+|---|---|
+| `Core` | GameManager (state), events, SaveSystem (versioned JSON), ObjectPool, Localization, bootstrap |
+| `Data` | ScriptableObject configs: game, growth, spawn, difficulty/regions |
+| `Mechanics` | Growth, Turbo, Health, Score, Difficulty — rules live here and are unit-tested |
+| `Entities` | Food, Gold food, Shark, Rock, Log, Hook (all pooled) |
+| `Spawning` | Weighted, fair spawn patterns + manual collision (no physics engine) |
+| `Player` / `River` / `Camera` | Input & movement, procedural watercolor visuals, screen fitting |
+| `UI` | HUD, menu, game over, pause, settings, toasts, safe area |
+| `Audio` | Pooled SFX + procedural synth clips, vibration |
+| `Ads` | `IAdsService`, `AdsManager` (consent → init → interstitial policy), AdMob, Mock |
 
-## 🔧 Setup
-1. Open **Unity Hub** → New Project → **2D (URP)** template → Unity 6 LTS
-2. Set project path to this repo's root
-3. Install packages: **Input System**, **Localization**, **TextMeshPro**
-4. Player Settings: **IL2CPP**, **ARM64**
-5. Create ScriptableObject assets: `Assets > Create > Upstream > ...`
+## 🧪 Tests
+*Window → General → Test Runner*: EditMode (rules, localization, ads policy, saves) and
+PlayMode (boots the real game: menu → play → die → continue → replay, pause, settings, ads, a 25 s unattended run).
 
-## 📱 Target
-- Android (AAB, IL2CPP, ARM64) — 60 FPS on mid-range devices
-- iOS ready architecture
-- Object pooling throughout — zero GC during gameplay
+## 🌍 Languages
+Turkish and English (`Core/LocalizationManager.cs`). The phone language decides on first launch;
+players can switch in Settings. Adding a language = one more column in the table.
 
-## 🔒 Ad Safety
-- Only Google **test** ad IDs in code
-- Real IDs loaded from `ad_config.json` (gitignored)
-- See `ad_config.example.json` for format
+## 💰 Ads
+Runs with `MockAdsService` until the Google Mobile Ads plugin is installed — see [docs/ADMOB.md](docs/ADMOB.md).
+Only Google's official **test** ad ids are in code; real ids go in the gitignored `Assets/Resources/ad_config.json`.
+
+## 📄 Release docs
+- [docs/KEYSTORE.md](docs/KEYSTORE.md) — creating and using the upload key
+- [docs/privacy-policy.html](docs/privacy-policy.html) — privacy policy draft (EN/TR)
+- [docs/store-listing.md](docs/store-listing.md) — store texts (EN/TR), name ideas, screenshot plan, data safety answers
+- [docs/ADMOB.md](docs/ADMOB.md) — switching from mock to real AdMob
 
 ## 📜 License
 All rights reserved © 2026

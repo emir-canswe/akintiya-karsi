@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.IO;
 using UnityEditor;
+using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using Upstream.Core;
@@ -56,7 +57,8 @@ namespace Upstream.EditorTools
             camObj.AddComponent<Upstream.Camera.GameCamera>();
 
             GameObject bootObj = new GameObject("UpstreamGameBootstrap");
-            bootObj.AddComponent<UpstreamGameBootstrap>();
+            var bootstrap = bootObj.AddComponent<UpstreamGameBootstrap>();
+            AssignConfigAssets(bootstrap);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
 
@@ -84,6 +86,20 @@ namespace Upstream.EditorTools
             CreateAssetIfMissing<DifficultyConfig>($"{ConfigFolder}/DifficultyConfig.asset");
         }
 
+        /// <summary>
+        /// Links the config assets to the bootstrap so Inspector tweaks are used at runtime
+        /// (otherwise the bootstrap falls back to fresh default instances).
+        /// </summary>
+        private static void AssignConfigAssets(UpstreamGameBootstrap bootstrap)
+        {
+            var so = new SerializedObject(bootstrap);
+            so.FindProperty("gameConfigAsset").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameConfig>($"{ConfigFolder}/GameConfig.asset");
+            so.FindProperty("growthConfigAsset").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GrowthConfig>($"{ConfigFolder}/GrowthConfig.asset");
+            so.FindProperty("spawnConfigAsset").objectReferenceValue = AssetDatabase.LoadAssetAtPath<SpawnConfig>($"{ConfigFolder}/SpawnConfig.asset");
+            so.FindProperty("difficultyConfigAsset").objectReferenceValue = AssetDatabase.LoadAssetAtPath<DifficultyConfig>($"{ConfigFolder}/DifficultyConfig.asset");
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private static void CreateAssetIfMissing<T>(string path) where T : ScriptableObject
         {
             if (AssetDatabase.LoadAssetAtPath<T>(path) == null)
@@ -96,31 +112,61 @@ namespace Upstream.EditorTools
         [MenuItem("Upstream/3. Build Android APK (Telefon Testi)", priority = 30)]
         public static void BuildAndroidApk()
         {
-            if (!File.Exists(ScenePath)) BuildAndSaveGameScene();
-            Directory.CreateDirectory("Builds");
-            EditorUserBuildSettings.buildAppBundle = false;
-            PlayerSettings.companyName = "EmirCan";
-            PlayerSettings.productName = "Upstream";
-            PlayerSettings.SetApplicationIdentifier( UnityEditor.Build.NamedBuildTarget.Android, "com.emircan.upstream");
-
-            BuildPipeline.BuildPlayer(new[] { ScenePath }, "Builds/Upstream.apk", BuildTarget.Android, BuildOptions.None);
-            Debug.Log("[Upstream] APK oluşturuldu: Builds/Upstream.apk");
+            BuildAndroid(appBundle: false);
         }
 
         [MenuItem("Upstream/4. Build Android AAB (Google Play Store)", priority = 31)]
         public static void BuildAndroidAab()
         {
+            BuildAndroid(appBundle: true);
+        }
+
+        /// <summary>
+        /// Command-line entry point (exits with 0 on success, 1 on failure):
+        /// Unity.exe -batchmode -quit -projectPath . -executeMethod Upstream.EditorTools.UpstreamSceneBuilder.BuildAndroidApkCli
+        /// </summary>
+        public static void BuildAndroidApkCli()
+        {
+            bool ok = BuildAndroid(appBundle: false);
+            EditorApplication.Exit(ok ? 0 : 1);
+        }
+
+        private static bool BuildAndroid(bool appBundle)
+        {
             if (!File.Exists(ScenePath)) BuildAndSaveGameScene();
             Directory.CreateDirectory("Builds");
-            EditorUserBuildSettings.buildAppBundle = true;
+
+            EditorUserBuildSettings.buildAppBundle = appBundle;
             PlayerSettings.companyName = "EmirCan";
             PlayerSettings.productName = "Upstream";
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.emircan.upstream");
+            // Same settings for test APKs and store AABs, so what you test on the phone is what ships.
             PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
 
-            BuildPipeline.BuildPlayer(new[] { ScenePath }, "Builds/Upstream.aab", BuildTarget.Android, BuildOptions.None);
-            Debug.Log("[Upstream] AAB oluşturuldu: Builds/Upstream.aab");
+            ReleaseSettings.Apply();
+            // Test APKs may be debug-signed; a Play Store AAB must be signed with the upload key.
+            if (!ReleaseSettings.ConfigureSigning(required: appBundle)) return false;
+
+            string output = appBundle ? "Builds/Upstream.aab" : "Builds/Upstream.apk";
+            BuildReport report;
+            try
+            {
+                report = BuildPipeline.BuildPlayer(new[] { ScenePath }, output, BuildTarget.Android, BuildOptions.None);
+            }
+            finally
+            {
+                ReleaseSettings.ClearSigningSecrets();
+            }
+
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[Upstream] Build FAILED ({report.summary.result}), {report.summary.totalErrors} error(s).");
+                return false;
+            }
+
+            Debug.Log($"[Upstream] Build OK: {output} ({report.summary.totalSize / (1024f * 1024f):0.0} MB)");
+            return true;
         }
     }
 }

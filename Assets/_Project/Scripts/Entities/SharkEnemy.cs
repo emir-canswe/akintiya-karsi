@@ -14,6 +14,8 @@ namespace Upstream.Entities
         [SerializeField] private SpawnConfig spawnConfig;
 
         public bool isLarge;
+        /// <summary>0..1 difficulty at spawn time; set before OnSpawn. Faster sharks later in the run.</summary>
+        public float difficulty;
         public bool isDead => isFlying;
 
         private float downwardVelocity = 80f;
@@ -30,8 +32,10 @@ namespace Upstream.Entities
         {
             base.OnSpawn(position);
             phase = Random.Range(0f, Mathf.PI * 2f);
-            float baseSpd = spawnConfig != null ? spawnConfig.baseSharkSpeed : 75f;
-            downwardVelocity = isLarge ? baseSpd * 0.85f : baseSpd;
+            float baseSpd = spawnConfig != null ? spawnConfig.baseSharkSpeed : 70f;
+            float spdIncrease = spawnConfig != null ? spawnConfig.sharkSpeedIncrease : 90f;
+            float spd = baseSpd + Mathf.Clamp01(difficulty) * spdIncrease;
+            downwardVelocity = isLarge ? spd * 0.85f : spd;
             cachedTransform.localScale = Vector3.one * (isLarge ? 1.4f : 1.0f);
         }
 

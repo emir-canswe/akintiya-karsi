@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using UnityEngine;
 #if USE_ADMOB
 using GoogleMobileAds.Api;
@@ -8,21 +7,26 @@ using GoogleMobileAds.Api;
 namespace Upstream.Ads
 {
     /// <summary>
-    /// AdMob implementation of IAdsService.
+    /// AdMob implementation of IAdsService. Compiled for real only when the Google Mobile Ads plugin is
+    /// installed and the USE_ADMOB scripting define is set; otherwise every call fails gracefully.
+    ///
+    /// Ad unit ids: Google's official TEST ids are the defaults. Real ids are read at runtime from
+    /// Assets/Resources/ad_config.json (gitignored, see Assets/_Project/Config/ad_config.example.json).
     /// </summary>
     public class AdMobService : MonoBehaviour, IAdsService
     {
-        [Header("IMPORTANT: These are TEST IDs. Replace with real IDs from ad_config.json before release.")]
-#if UNITY_ANDROID
-        private string rewardedAdId = "ca-app-pub-3940256099942544/5224354917";
-        private string interstitialAdId = "ca-app-pub-3940256099942544/1033173712";
-#elif UNITY_IOS
+        private const string ConfigResource = "ad_config";
+
+#if UNITY_IOS
         private string rewardedAdId = "ca-app-pub-3940256099942544/1712485313";
         private string interstitialAdId = "ca-app-pub-3940256099942544/4411468910";
 #else
-        private string rewardedAdId = "unexpected_platform";
-        private string interstitialAdId = "unexpected_platform";
+        private string rewardedAdId = "ca-app-pub-3940256099942544/5224354917";
+        private string interstitialAdId = "ca-app-pub-3940256099942544/1033173712";
 #endif
+
+        public string RewardedAdId => rewardedAdId;
+        public string InterstitialAdId => interstitialAdId;
 
 #if USE_ADMOB
         private RewardedAd rewardedAd;
@@ -60,38 +64,41 @@ namespace Upstream.Ads
 
         private void LoadConfig()
         {
-            string configPath = Path.Combine(Application.streamingAssetsPath, "ad_config.json");
-            if (File.Exists(configPath))
+            // Resources (not StreamingAssets): on Android StreamingAssets lives inside the APK,
+            // so File.Exists on it is always false and the real ids would never be read.
+            var asset = Resources.Load<TextAsset>(ConfigResource);
+            if (asset == null) return;
+
+            try
             {
-                try
-                {
-                    string json = File.ReadAllText(configPath);
-                    var config = JsonUtility.FromJson<AdConfig>(json);
-#if UNITY_ANDROID
-                    if (!string.IsNullOrEmpty(config.android_rewarded_id)) rewardedAdId = config.android_rewarded_id;
-                    if (!string.IsNullOrEmpty(config.android_interstitial_id)) interstitialAdId = config.android_interstitial_id;
-#elif UNITY_IOS
-                    if (!string.IsNullOrEmpty(config.ios_rewarded_id)) rewardedAdId = config.ios_rewarded_id;
-                    if (!string.IsNullOrEmpty(config.ios_interstitial_id)) interstitialAdId = config.ios_interstitial_id;
+                var config = JsonUtility.FromJson<AdConfig>(asset.text);
+                if (config == null) return;
+#if UNITY_IOS
+                if (!string.IsNullOrEmpty(config.ios_rewarded_id)) rewardedAdId = config.ios_rewarded_id;
+                if (!string.IsNullOrEmpty(config.ios_interstitial_id)) interstitialAdId = config.ios_interstitial_id;
+#else
+                if (!string.IsNullOrEmpty(config.android_rewarded_id)) rewardedAdId = config.android_rewarded_id;
+                if (!string.IsNullOrEmpty(config.android_interstitial_id)) interstitialAdId = config.android_interstitial_id;
 #endif
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[AdMob] Failed to load ad_config.json: {e.Message}");
-                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[AdMob] Failed to parse ad_config.json: {e.Message}");
             }
         }
 
         public void Initialize()
         {
 #if USE_ADMOB
-            MobileAds.Initialize(initStatus => 
+            // Ad callbacks otherwise arrive on a background thread; touching Unity objects from there crashes.
+            MobileAds.RaiseAdEventsOnUnityMainThread = true;
+            MobileAds.Initialize(initStatus =>
             {
                 LoadRewardedAd();
                 LoadInterstitialAd();
             });
 #else
-            Debug.LogWarning("USE_ADMOB is not defined. Ads will not initialize.");
+            Debug.Log("[AdMob] USE_ADMOB is not defined; AdMob is disabled.");
 #endif
         }
 
@@ -104,12 +111,11 @@ namespace Upstream.Ads
                 rewardedAd = null;
             }
 
-            var adRequest = new AdRequest();
-            RewardedAd.Load(rewardedAdId, adRequest, (RewardedAd ad, LoadAdError error) =>
+            RewardedAd.Load(rewardedAdId, new AdRequest(), (RewardedAd ad, LoadAdError error) =>
             {
                 if (error != null || ad == null)
                 {
-                    Debug.LogError($"[AdMob] Rewarded ad failed to load: {error}");
+                    Debug.LogWarning($"[AdMob] Rewarded ad failed to load: {error}");
                     return;
                 }
                 rewardedAd = ad;
@@ -120,27 +126,36 @@ namespace Upstream.Ads
         public void ShowRewardedAd(Action onRewardGranted, Action onAdFailed)
         {
 #if USE_ADMOB
-            if (IsRewardedAdReady)
+            if (!IsRewardedAdReady)
             {
-                rewardedAd.OnAdFullScreenContentClosed += () => 
-                {
-                    LoadRewardedAd(); // Load next ad
-                };
-                rewardedAd.OnAdFullScreenContentFailed += (AdError error) => 
-                {
-                    LoadRewardedAd();
-                    onAdFailed?.Invoke();
-                };
-
-                rewardedAd.Show((Reward reward) =>
-                {
-                    onRewardGranted?.Invoke();
-                });
-            }
-            else
-            {
+                LoadRewardedAd();
                 onAdFailed?.Invoke();
+                return;
             }
+
+            // The reward callback fires while the ad is still on screen. Remember it and grant the
+            // continue only once the ad is closed, so the run never resumes behind the ad.
+            bool earned = false;
+            bool finished = false;
+
+            rewardedAd.OnAdFullScreenContentClosed += () =>
+            {
+                if (finished) return;
+                finished = true;
+                LoadRewardedAd();
+                if (earned) onRewardGranted?.Invoke();
+                else onAdFailed?.Invoke();
+            };
+            rewardedAd.OnAdFullScreenContentFailed += (AdError error) =>
+            {
+                if (finished) return;
+                finished = true;
+                Debug.LogWarning($"[AdMob] Rewarded ad failed to show: {error}");
+                LoadRewardedAd();
+                onAdFailed?.Invoke();
+            };
+
+            rewardedAd.Show((Reward reward) => earned = true);
 #else
             onAdFailed?.Invoke();
 #endif
@@ -155,12 +170,11 @@ namespace Upstream.Ads
                 interstitialAd = null;
             }
 
-            var adRequest = new AdRequest();
-            InterstitialAd.Load(interstitialAdId, adRequest, (InterstitialAd ad, LoadAdError error) =>
+            InterstitialAd.Load(interstitialAdId, new AdRequest(), (InterstitialAd ad, LoadAdError error) =>
             {
                 if (error != null || ad == null)
                 {
-                    Debug.LogError($"[AdMob] Interstitial ad failed to load: {error}");
+                    Debug.LogWarning($"[AdMob] Interstitial ad failed to load: {error}");
                     return;
                 }
                 interstitialAd = ad;
@@ -171,25 +185,30 @@ namespace Upstream.Ads
         public void ShowInterstitialAd(Action onAdClosed)
         {
 #if USE_ADMOB
-            if (IsInterstitialAdReady)
+            if (!IsInterstitialAdReady)
             {
-                interstitialAd.OnAdFullScreenContentClosed += () => 
-                {
-                    LoadInterstitialAd();
-                    onAdClosed?.Invoke();
-                };
-                interstitialAd.OnAdFullScreenContentFailed += (AdError error) => 
-                {
-                    LoadInterstitialAd();
-                    onAdClosed?.Invoke();
-                };
-
-                interstitialAd.Show();
-            }
-            else
-            {
+                LoadInterstitialAd();
                 onAdClosed?.Invoke();
+                return;
             }
+
+            bool finished = false;
+            interstitialAd.OnAdFullScreenContentClosed += () =>
+            {
+                if (finished) return;
+                finished = true;
+                LoadInterstitialAd();
+                onAdClosed?.Invoke();
+            };
+            interstitialAd.OnAdFullScreenContentFailed += (AdError error) =>
+            {
+                if (finished) return;
+                finished = true;
+                LoadInterstitialAd();
+                onAdClosed?.Invoke();
+            };
+
+            interstitialAd.Show();
 #else
             onAdClosed?.Invoke();
 #endif

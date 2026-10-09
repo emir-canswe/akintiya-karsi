@@ -1,5 +1,6 @@
 using UnityEngine;
 using Upstream.Core;
+using Upstream.Camera;
 
 namespace Upstream.Entities
 {
@@ -70,7 +71,8 @@ namespace Upstream.Entities
                 cachedTransform.Rotate(0f, 0f, flyRotationSpeed * dt);
                 yPosition = fpos.y;
 
-                if (yPosition < -450f || yPosition > 550f || Mathf.Abs(fpos.x) > 420f)
+                float h = GameCamera.ViewHalfHeight;
+                if (yPosition < -h - 150f || yPosition > h + 250f || Mathf.Abs(fpos.x) > 420f)
                 {
                     isActive = false;
                 }
@@ -84,7 +86,7 @@ namespace Upstream.Entities
             pos.y = yPosition;
             cachedTransform.position = pos;
 
-            if (yPosition < -400f)
+            if (yPosition < -GameCamera.ViewHalfHeight - 100f)
             {
                 isActive = false;
             }

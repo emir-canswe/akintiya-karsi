@@ -46,8 +46,9 @@ namespace Upstream.Data
             {
                 regionName = "Rapids",
                 startDistance = 20000f,
-                waterColor1 = new Color(0.8f, 0.9f, 1.0f),
-                waterColor2 = new Color(0.6f, 0.7f, 0.9f),
+                // Churning grey-teal: light enough to read as "white water" but food/foam stay visible.
+                waterColor1 = new Color(0.36f, 0.70f, 0.74f),
+                waterColor2 = new Color(0.22f, 0.50f, 0.58f),
                 bankColor = new Color(0.5f, 0.5f, 0.5f),
                 grassColor = new Color(0.4f, 0.4f, 0.4f),
                 speedMultiplier = 1.15f

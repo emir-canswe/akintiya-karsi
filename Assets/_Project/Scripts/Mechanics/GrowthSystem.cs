@@ -51,9 +51,14 @@ namespace Upstream.Mechanics
             }
         }
 
-        private void Awake()
+        // Resolved lazily: the bootstrap adds HealthSystem after GrowthSystem, so it doesn't exist yet in Awake.
+        private HealthSystem Health
         {
-            healthSystem = GetComponent<HealthSystem>();
+            get
+            {
+                if (healthSystem == null) healthSystem = GetComponent<HealthSystem>();
+                return healthSystem;
+            }
         }
 
         private void OnEnable()
@@ -85,9 +90,9 @@ namespace Upstream.Mechanics
                 currentStageIndex++;
                 GameEvents.OnGrowthStageChanged?.Invoke(currentStageIndex);
 
-                if (CurrentStageData != null && CurrentStageData.healOnStageUp && healthSystem != null)
+                if (CurrentStageData != null && CurrentStageData.healOnStageUp && Health != null)
                 {
-                    healthSystem.Heal(1);
+                    Health.Heal(1);
                 }
             }
         }
@@ -110,7 +115,7 @@ namespace Upstream.Mechanics
         public void ResetGrowth()
         {
             var save = SaveSystem.Load();
-            currentStageIndex = Mathf.Clamp(save.unlockedStartStage, 0, Config.stages.Length - 1);
+            currentStageIndex = Config.GetStartStage(save.bestStageReached);
             totalFoodEaten = Config.stages[currentStageIndex].foodRequired;
             GameEvents.OnGrowthStageChanged?.Invoke(currentStageIndex);
         }
