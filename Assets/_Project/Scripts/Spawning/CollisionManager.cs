@@ -224,9 +224,21 @@ namespace Upstream.Spawning
                         bool waveRider = fish.Has(FishAbility.WaveRider);
                         float halfW = wave.width * 0.5f;
                         float wx = Mathf.Clamp(playerPos.x, ePos.x - halfW, ePos.x + halfW);
-                        float wy = Mathf.Clamp(playerPos.y, ePos.y - WaveObstacle.Height * 0.5f, ePos.y + WaveObstacle.Height * 0.5f);
+                        float wy = Mathf.Clamp(playerPos.y, wave.HitCenterY - wave.HitHalfHeight, wave.HitCenterY + wave.HitHalfHeight);
                         if (Vector2.Distance(playerPos, new Vector2(wx, wy)) < pRadius)
                         {
+                            if (wave.isBig)
+                            {
+                                // A big wave from the speed-limit set: nobody dodges it, it takes river speed away
+                                // for good (a relief, so it works the same in turbo and for wave riders).
+                                wave.Spend(playerPos.x);
+                                riverController?.ApplyBigWave();
+                                gameCamera?.Shake(5f);
+                                GameEvents.OnBigWaveHit?.Invoke();
+                                toastUI?.Show(LocalizationManager.Get("surge_hit_toast"), new Color(0.55f, 0.85f, 1f));
+                                break;
+                            }
+
                             wave.Spend();
                             if (!isTurbo && !waveRider)
                             {

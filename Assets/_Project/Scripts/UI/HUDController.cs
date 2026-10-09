@@ -87,6 +87,7 @@ namespace Upstream.UI
             GameEvents.OnTurboEnd += HandleTurboEnd;
             GameEvents.OnGrowthStageChanged += HandleGrowthStageChanged;
             GameEvents.OnGoldFoodResolved += HandleGoldFoodResolved;
+            GameEvents.OnWaveSurge += HandleWaveSurge;
             GameEvents.OnGameStart += HandleGameStart;
             GameEvents.OnGameOver += HandleGameOver;
             GameEvents.OnContinueUsed += HandleContinueUsed;
@@ -102,6 +103,7 @@ namespace Upstream.UI
             GameEvents.OnTurboEnd -= HandleTurboEnd;
             GameEvents.OnGrowthStageChanged -= HandleGrowthStageChanged;
             GameEvents.OnGoldFoodResolved -= HandleGoldFoodResolved;
+            GameEvents.OnWaveSurge -= HandleWaveSurge;
             GameEvents.OnGameStart -= HandleGameStart;
             GameEvents.OnGameOver -= HandleGameOver;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
@@ -222,6 +224,11 @@ namespace Upstream.UI
             if (toastUI == null) return;
             if (healed > 0) toastUI.Show(LocalizationManager.Format("heal_toast", healed), new Color(1f, 0.84f, 0.35f));
             else toastUI.Show(LocalizationManager.Get("power_toast"), new Color(0.49f, 0.94f, 0.78f));
+        }
+
+        private void HandleWaveSurge()
+        {
+            if (toastUI != null) toastUI.Show(LocalizationManager.Get("surge_toast"), new Color(0.45f, 0.85f, 1f));
         }
 
         private void HandleGameStart()

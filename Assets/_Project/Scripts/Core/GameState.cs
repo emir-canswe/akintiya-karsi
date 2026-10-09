@@ -45,6 +45,10 @@ namespace Upstream.Core
         public static Action<int> OnShieldBlocked;
         /// <summary>The fish swam into a wave and got slowed down.</summary>
         public static Action OnWaveHit;
+        /// <summary>The river reached its speed limit: a set of big waves is on its way.</summary>
+        public static Action OnWaveSurge;
+        /// <summary>A big wave rolled over the fish and took some river speed away.</summary>
+        public static Action OnBigWaveHit;
         /// <summary>The player left the game over screen for the main menu.</summary>
         public static Action OnReturnToMenu;
     }

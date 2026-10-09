@@ -204,7 +204,7 @@ namespace Upstream.Core
             var logPool = CreatePool("LogPool", logPrefab, 8, poolsRoot);
             var hookPool = CreatePool("HookPool", hookPrefab, 8, poolsRoot);
             var coinPool = CreatePool("CoinPool", coinPrefab, 24, poolsRoot);
-            var wavePool = CreatePool("WavePool", wavePrefab, 3, poolsRoot);
+            var wavePool = CreatePool("WavePool", wavePrefab, 6, poolsRoot); // a big-wave set is 3 on its own
 
             // 8. SpawnManager & UI & CollisionManager
             GameObject spawnerObj = new GameObject("SpawnManager");

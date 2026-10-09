@@ -24,6 +24,11 @@ MonoBehaviour:
   goldFoodHeal: 10
   stageUpHeal: 10
   legendaryBonusHP: 15
+  waveSurgeFromMeters: 2000
+  waveSurgeSpeed: 340
+  waveSurgeSpeedStep: 0
+  waveSurgeCount: 2
+  waveSpeedDrop: 35
   powerPerFood: 12
   maxPower: 100
   riverHalfWidth: 150

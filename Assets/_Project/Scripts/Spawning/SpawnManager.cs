@@ -33,6 +33,10 @@ namespace Upstream.Spawning
         private ObjectPool<WaveObstacle> wavePool;
 
         private float nextSpawnDistance = 120f;
+        private bool surgePending;
+
+        /// <summary>Distance between two big waves of a set (world units).</summary>
+        public const float SurgeWaveSpacing = 420f;
         private readonly List<EntityBase> activeEntities = new List<EntityBase>(64);
 
         public IReadOnlyList<EntityBase> ActiveEntities => activeEntities;
@@ -74,6 +78,7 @@ namespace Upstream.Spawning
             GameEvents.OnGameStart += HandleGameStart;
             GameEvents.OnContinueUsed += HandleContinueUsed;
             GameEvents.OnReturnToMenu += ClearAllEntities;
+            GameEvents.OnWaveSurge += HandleWaveSurge;
         }
 
         private void OnDisable()
@@ -81,7 +86,10 @@ namespace Upstream.Spawning
             GameEvents.OnGameStart -= HandleGameStart;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
             GameEvents.OnReturnToMenu -= ClearAllEntities;
+            GameEvents.OnWaveSurge -= HandleWaveSurge;
         }
+
+        private void HandleWaveSurge() => surgePending = true;
 
         private void Update()
         {
@@ -117,15 +125,17 @@ namespace Upstream.Spawning
         {
             ClearAllEntities();
             nextSpawnDistance = 90f;
+            surgePending = false;
         }
 
         private void HandleContinueUsed()
         {
-            // Clear nearby hazards on continue so player isn't immediately hit
+            // Clear nearby hazards on continue so player isn't immediately hit (waves don't hurt: they stay)
             for (int i = activeEntities.Count - 1; i >= 0; i--)
             {
                 var e = activeEntities[i];
-                if (e.Type != EntityType.Food && e.Type != EntityType.GoldFood && e.Type != EntityType.Coin && e.yPosition < 180f)
+                if (e.Type != EntityType.Food && e.Type != EntityType.GoldFood && e.Type != EntityType.Coin &&
+                    e.Type != EntityType.Wave && e.yPosition < 180f)
                 {
                     ReturnToPool(e);
                     activeEntities.RemoveAt(i);
@@ -144,6 +154,15 @@ namespace Upstream.Spawning
 
         public void Tick(float dt, float currentDistance, int currentStage, float flowSpeed)
         {
+            if (surgePending && wavePool != null)
+            {
+                surgePending = false;
+                int count = gameConfig != null ? Mathf.Max(1, gameConfig.waveSurgeCount) : 3;
+                SpawnWaveSurge(count);
+                // Nothing else spawns while the set rolls in: the waves are the event.
+                nextSpawnDistance = Mathf.Max(nextSpawnDistance, currentDistance + count * SurgeWaveSpacing);
+            }
+
             if (currentDistance >= nextSpawnDistance)
             {
                 float diff = difficultyScaler != null
@@ -285,7 +304,7 @@ namespace Upstream.Spawning
             float side = Random.value < 0.5f ? -1f : 1f;
 
             // Now and then a wave rolls down the river instead of the usual pattern.
-            if (wavePool != null && Random.value < Mathf.Lerp(0.11f, 0.18f, difficulty))
+            if (wavePool != null && Random.value < Mathf.Lerp(0.06f, 0.10f, difficulty))
             {
                 SpawnWave(rw, startY, side);
                 return;
@@ -475,6 +494,7 @@ namespace Upstream.Spawning
             float minGap = pRadius * 2f + 40f; // always passable, even for a huge fish
 
             var wave = wavePool.Get();
+            wave.isBig = false;
             float len, centerX, gapX;
             if (Random.value < 0.35f)
             {
@@ -494,6 +514,27 @@ namespace Upstream.Spawning
             activeEntities.Add(wave);
 
             SpawnCoinLine(Mathf.Clamp(gapX, -rw + 26f, rw - 26f), startY - 10f, 2, 26f, 0f);
+        }
+
+        /// <summary>
+        /// A set of big waves across the whole river (they can't be dodged: each one slows the river down),
+        /// with a few coins riding between them.
+        /// </summary>
+        private void SpawnWaveSurge(int count)
+        {
+            float rw = gameConfig != null ? gameConfig.riverHalfWidth : 150f;
+            float startY = GameCamera.ViewHalfHeight + 70f;
+            for (int i = 0; i < count; i++)
+            {
+                float y = startY + i * SurgeWaveSpacing;
+                var wave = wavePool.Get();
+                wave.isBig = true;
+                wave.width = rw * 2f - 6f; // bank to bank, without spilling onto the sand
+                wave.OnSpawn(new Vector2(0f, y));
+                activeEntities.Add(wave);
+
+                if (i < count - 1) SpawnCoinLine(Random.Range(-rw + 40f, rw - 40f), y + SurgeWaveSpacing * 0.35f, 3, 26f, 12f);
+            }
         }
 
         /// <summary>Vertical line of coins starting at (x, y) going upstream, with an optional sideways wave.</summary>

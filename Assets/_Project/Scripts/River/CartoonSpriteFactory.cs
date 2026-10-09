@@ -16,7 +16,7 @@ namespace Upstream.River
         private static Sprite shrimp, star, rock, log, hook, heart, bubble, glint, sparkle;
         private static Sprite caustics, grassTile, shoreTile, waterGlow;
         private static Sprite tree, flowerBush, mushroom, stone, lilyPad;
-        private static Sprite barFill, homeIcon, playIcon, pauseIcon, wave, closeIcon, dragIcon;
+        private static Sprite barFill, homeIcon, playIcon, pauseIcon, wave, closeIcon, dragIcon, bigWave, foamStrip;
 
         public static readonly Color GrassColor = Hex("#6CCB4A");
 
@@ -377,6 +377,91 @@ namespace Upstream.River
             wave = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1.1f, 0, SpriteMeshType.FullRect,
                                  new Vector4(24f, 0f, 24f, 0f));
             return wave;
+        }
+
+        /// <summary>
+        /// Big river-wide wave, tiling sideways: a scalloped foam crest at the front (bottom, facing downstream),
+        /// a darker curl just behind it and a sunlit back that fades into the river.
+        /// </summary>
+        public static Sprite GetBigWave()
+        {
+            if (bigWave != null) return bigWave;
+            const int w = 128, h = 80;
+            Color lip = Hex("#1F5CC4"), face = Hex("#3C8FEA"), back = Hex("#7FD6FF"), outline = Hex("#163C8C");
+            Color foamShade = Hex("#CDEFFF");
+            var px = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    // Everything repeats every 16/32/128 px so the texture tiles without seams.
+                    float foamTop = 25f + 2.5f * Mathf.Sin(p.x / w * Mathf.PI * 2f * 4f);
+                    float scallop = SdCircle(new Vector2(Frac(p.x / 16f) * 16f, p.y), new Vector2(8f, 14f), 8.2f);
+                    float bubble = SdCircle(new Vector2(Frac((p.x + 8f) / 32f) * 32f, p.y), new Vector2(16f, 8.5f), 4.6f);
+                    float foamBand = Mathf.Max(14f - p.y, p.y - foamTop);
+                    float foam = Mathf.Min(Mathf.Min(scallop, bubble), foamBand);
+
+                    Color c;
+                    if (foam < 0f)
+                    {
+                        // Foam: white, a touch of blue at the bottom of each puff, dark rim underneath.
+                        c = Color.Lerp(foamShade, Color.white, Mathf.Clamp01((p.y - 6f) / 10f));
+                        if (foam > -2.2f && p.y < foamTop - 3f) c = Color.Lerp(c, outline, Mathf.Clamp01(foam + 2.2f));
+                        c.a = 1f;
+                    }
+                    else if (p.y > foamTop - 1f)
+                    {
+                        // Water body: dark curl right behind the crest, lighter toward the back, fading out.
+                        float t = Mathf.Clamp01((p.y - foamTop) / (h - foamTop));
+                        c = t < 0.25f ? Color.Lerp(lip, face, t / 0.25f) : Color.Lerp(face, back, (t - 0.25f) / 0.75f);
+                        // Curving streaks of light along the wave
+                        float streak = Mathf.Abs(Frac((p.x + Mathf.Sin(p.y * 0.14f) * 9f) / 32f) - 0.5f);
+                        if (streak < 0.035f && t > 0.12f && t < 0.7f) c = Color.Lerp(c, Color.white, 0.45f * (1f - t));
+                        c.a = 0.95f * (1f - Smooth(0.45f, 1f, t)) * Mathf.Clamp01(p.y - foamTop + 1f);
+                    }
+                    else
+                    {
+                        // Anti-aliased rim just outside the foam
+                        c = outline;
+                        c.a = Mathf.Clamp01(1f - foam) * (p.y < foamTop ? 1f : 0f);
+                    }
+                    px[y * w + x] = c;
+                }
+            }
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat };
+            tex.SetPixels(px);
+            tex.Apply();
+            bigWave = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1.1f, 0, SpriteMeshType.FullRect);
+            return bigWave;
+        }
+
+        /// <summary>Strip of churning foam puffs (tiles sideways); laid over a big wave's crest and swayed.</summary>
+        public static Sprite GetFoamStrip()
+        {
+            if (foamStrip != null) return foamStrip;
+            const int w = 64, h = 24;
+            Color shade = Hex("#D8F3FF");
+            var px = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    float d = SdCircle(new Vector2(Frac(p.x / 16f) * 16f, p.y), new Vector2(8f, 12f), 6.4f);
+                    d = Mathf.Min(d, SdCircle(new Vector2(Frac((p.x + 8f) / 32f) * 32f, p.y), new Vector2(16f, 15f), 4.2f));
+                    d = Mathf.Min(d, SdCircle(p, new Vector2(40f, 6f), 2.6f));
+                    d = Mathf.Min(d, SdCircle(p, new Vector2(12f, 5f), 2f));
+                    Color c = Color.Lerp(shade, Color.white, Mathf.Clamp01((p.y - 6f) / 10f));
+                    c.a = Mathf.Clamp01(0.5f - d);
+                    px[y * w + x] = c;
+                }
+            }
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat };
+            tex.SetPixels(px);
+            tex.Apply();
+            foamStrip = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1.1f, 0, SpriteMeshType.FullRect);
+            return foamStrip;
         }
 
         // ------------------------------------------------------------------ predators

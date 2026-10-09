@@ -28,8 +28,10 @@ namespace Upstream.Entities
         private const float SteerAccel = 240f;   // sideways acceleration (units/s^2)
         private const float TailSwing = 26f;     // tail beat amplitude (degrees)
         private const float BodySway = 5f;       // body counter-sway (degrees)
-        private const float PikeTriggerDistance = 250f;
-        private const float PikeWindup = 0.45f;
+        private const float PikeTriggerDistance = 300f;
+        private const float PikeWindup = 0.4f;
+        /// <summary>Lunge speed (own swimming, on top of the river) at difficulty 0 and 1.</summary>
+        private const float PikeLungeEasy = 230f, PikeLungeHard = 330f;
 
         // Hit circles along the body (offsets in local Y) and their radius, per kind, before scaling.
         private static readonly float[] SharkParts = { -16f, 4f, 24f };
@@ -54,7 +56,7 @@ namespace Upstream.Entities
                                    : kind == PredatorKind.Catfish ? CatfishParts
                                    : SharkParts;
 
-        public float HitRadius => kind == PredatorKind.Pike ? 9f
+        public float HitRadius => kind == PredatorKind.Pike ? 11f
                                 : kind == PredatorKind.Piranha ? 11f
                                 : kind == PredatorKind.Catfish ? 21f
                                 : 16f;
@@ -140,8 +142,8 @@ namespace Upstream.Entities
                 case PredatorKind.Pike:
                     if (pikeTimer < 0f)
                     {
-                        // Cruise slowly, lining up a little with the player
-                        if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 1.2f, -trackingSpeed * 0.6f, trackingSpeed * 0.6f);
+                        // Cruise slowly, stalking: lines up with the player like a shark does
+                        if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 2f, -trackingSpeed, trackingSpeed);
                         if (playerTransform != null && yPosition - playerTransform.position.y < PikeTriggerDistance) pikeTimer = 0f;
                     }
                     else if (pikeTimer < PikeWindup)
@@ -149,14 +151,16 @@ namespace Upstream.Entities
                         // Wind-up: nearly stops and shivers (the warning), aiming at the player
                         pikeTimer += dt;
                         downwardVelocity = Mathf.MoveTowards(downwardVelocity, -flowSpeed * 0.6f, 900f * dt);
-                        targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 3f, -trackingSpeed, trackingSpeed);
+                        targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 3f, -trackingSpeed * 1.4f, trackingSpeed * 1.4f);
                         shiver = Mathf.Sin(Time.time * 60f) * 6f;
                         beatSpeed = 24f;
                     }
                     else
                     {
-                        // Lunge: straight and fast
-                        downwardVelocity = Mathf.MoveTowards(downwardVelocity, cruiseSpeed * 4.8f, 1400f * dt);
+                        // Lunge: fast, still bending a little toward the player (a quick sideways dash dodges it)
+                        float lunge = Mathf.Lerp(PikeLungeEasy, PikeLungeHard, Mathf.Clamp01(difficulty));
+                        downwardVelocity = Mathf.MoveTowards(downwardVelocity, lunge, 1800f * dt);
+                        if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 1.5f, -trackingSpeed * 0.9f, trackingSpeed * 0.9f);
                         beatSpeed = 20f;
                     }
                     break;

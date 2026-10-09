@@ -26,6 +26,7 @@ namespace Upstream.Audio
             AudioClip ambient = CreateAmbientStreamLoop("AMB_River", 3.0f, 0.08f);
 
             manager.SetClips(eatFood, eatGold, turboStart, turboLoop, hurt, die, sharkEat, stageUp, click, ambient);
+            manager.SetWaveSplash(CreateWaveSplash("SFX_WaveSplash", 0.7f, 0.34f));
         }
 
         private static AudioClip CreatePluck(string name, float startFreq, float endFreq, float duration, float volume)
@@ -125,6 +126,32 @@ namespace Upstream.Audio
                 float triumph = Mathf.Sin(i / (float)SampleRate * 587.33f * Mathf.PI * 2f) * Mathf.Pow(1f - t, 1.6f) * 0.35f;
 
                 data[i] = Mathf.Clamp((subBass * 0.65f + crunch + triumph) * 0.55f, -1f, 1f);
+            }
+
+            AudioClip clip = AudioClip.Create(name, samples, 1, SampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        /// <summary>Breaking wave: a low swell rising into a burst of hissing foam that washes away.</summary>
+        private static AudioClip CreateWaveSplash(string name, float duration, float volume)
+        {
+            int samples = Mathf.RoundToInt(SampleRate * duration);
+            float[] data = new float[samples];
+            System.Random rng = new System.Random(7);
+            float low = 0f, high = 0f, prevWhite = 0f;
+
+            for (int i = 0; i < samples; i++)
+            {
+                float t = (float)i / samples;
+                float white = (float)rng.NextDouble() * 2f - 1f;
+                low = low * 0.97f + white * 0.03f;           // deep rumble of the swell
+                high = 0.6f * (white - prevWhite) + 0.4f * high; // bright hiss of the foam
+                prevWhite = white;
+                float swell = Mathf.Sin(Mathf.Clamp01(t / 0.35f) * Mathf.PI * 0.5f);
+                float crash = t < 0.18f ? 0f : Mathf.Pow(1f - (t - 0.18f) / 0.82f, 1.6f);
+                float tail = Mathf.Pow(1f - t, 2.2f);
+                data[i] = Mathf.Clamp((low * 6f * swell * tail + high * 0.55f * crash) * volume, -1f, 1f);
             }
 
             AudioClip clip = AudioClip.Create(name, samples, 1, SampleRate, false);

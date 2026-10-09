@@ -67,6 +67,7 @@ namespace Upstream.River
             GameEvents.OnGrowthStageChanged += HandleStageUp;
             GameEvents.OnCoinCollected += HandleCoinCollected;
             GameEvents.OnWaveHit += HandleWaveHit;
+            GameEvents.OnBigWaveHit += HandleBigWaveHit;
             GameEvents.OnShieldBlocked += HandleShieldBlocked;
         }
 
@@ -78,6 +79,7 @@ namespace Upstream.River
             GameEvents.OnGrowthStageChanged -= HandleStageUp;
             GameEvents.OnCoinCollected -= HandleCoinCollected;
             GameEvents.OnWaveHit -= HandleWaveHit;
+            GameEvents.OnBigWaveHit -= HandleBigWaveHit;
             GameEvents.OnShieldBlocked -= HandleShieldBlocked;
         }
 
@@ -266,6 +268,12 @@ namespace Upstream.River
         {
             Vector2 pos = PlayerPos(new Vector2(0f, 14f), new Vector2(0f, -120f));
             SpawnBurst(pos, new Color(1f, 1f, 1f, 0.9f), 10, 110f, 0.26f, asBubbles: true);
+        }
+
+        private void HandleBigWaveHit()
+        {
+            Vector2 pos = PlayerPos(new Vector2(0f, 10f), new Vector2(0f, -120f));
+            SpawnBurst(pos, new Color(1f, 1f, 1f, 0.95f), 16, 150f, 0.3f, asBubbles: true);
         }
 
         private void HandlePlayerHurt(int hp)

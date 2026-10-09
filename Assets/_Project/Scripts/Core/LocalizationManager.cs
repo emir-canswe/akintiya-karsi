@@ -40,6 +40,8 @@ namespace Upstream.Core
 
             // Game over
             { "wave_toast", new Entry("DALGA! Yavaşladın", "WAVE! Slowed down") },
+            { "surge_toast", new Entry("DALGALAR GELİYOR!", "BIG WAVES COMING!") },
+            { "surge_hit_toast", new Entry("AKINTI YAVAŞLADI", "CURRENT SLOWED") },
             { "distance_label", new Entry("MESAFE", "DISTANCE") },
             { "game_over_title", new Entry("BALIK YORULDU", "OUT OF BREATH") },
             { "new_best", new Entry("YENİ REKOR!", "NEW BEST!") },

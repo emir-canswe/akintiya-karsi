@@ -29,6 +29,7 @@ namespace Upstream.Audio
         [SerializeField] private AudioClip stageUp;
         [SerializeField] private AudioClip buttonClick;
         [SerializeField] private AudioClip ambientWater;
+        [SerializeField] private AudioClip waveSplash;
 
         private AudioSource turboSource;
         private TurboSystem turboSystem;
@@ -68,6 +69,9 @@ namespace Upstream.Audio
                 ambientSource.Play();
             }
         }
+
+        /// <summary>Crashing-water sound for the big speed-limit waves.</summary>
+        public void SetWaveSplash(AudioClip clip) => waveSplash = clip;
 
         private void Awake()
         {
@@ -125,6 +129,8 @@ namespace Upstream.Audio
             GameEvents.OnCoinCollected += HandleCoinCollected;
             GameEvents.OnWaveHit += HandleWaveHit;
             GameEvents.OnShieldBlocked += HandleShieldBlocked;
+            GameEvents.OnWaveSurge += HandleWaveSurge;
+            GameEvents.OnBigWaveHit += HandleBigWaveHit;
         }
 
         private void OnDisable()
@@ -139,6 +145,8 @@ namespace Upstream.Audio
             GameEvents.OnCoinCollected -= HandleCoinCollected;
             GameEvents.OnWaveHit -= HandleWaveHit;
             GameEvents.OnShieldBlocked -= HandleShieldBlocked;
+            GameEvents.OnWaveSurge -= HandleWaveSurge;
+            GameEvents.OnBigWaveHit -= HandleBigWaveHit;
         }
 
         public void PlaySFX(AudioClip clip, float pitch = 1f)
@@ -226,6 +234,15 @@ namespace Upstream.Audio
         {
             PlaySFX(hurt, 0.6f);
             Vibrate(30);
+        }
+
+        // Distant rumble as the set appears, a full crash as each big wave breaks over the fish.
+        private void HandleWaveSurge() => PlaySFX(waveSplash, 0.55f);
+
+        private void HandleBigWaveHit()
+        {
+            PlaySFXPitchVaried(waveSplash, 0.9f, 1.1f);
+            Vibrate(45);
         }
 
         // Shield pop: a bright high chime instead of the hurt sound

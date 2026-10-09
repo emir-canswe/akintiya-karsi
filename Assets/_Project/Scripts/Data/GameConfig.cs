@@ -24,6 +24,21 @@ namespace Upstream.Data
         /// <summary>Extra max health from a legendary fish (FishDef.extraHeart).</summary>
         public int legendaryBonusHP = 15;
 
+        [Header("Big waves")]
+        /// <summary>No big waves before this distance: they belong to a really fast river, late in a run.</summary>
+        public float waveSurgeFromMeters = 2000f;
+        /// <summary>River speed needed for a set of big waves (past <see cref="waveSurgeFromMeters"/>).</summary>
+        public float waveSurgeSpeed = 340f;
+        /// <summary>
+        /// A following set needs the river back at the last set's speed plus this; 0 = as soon as it is as fast again
+        /// (about 1300 m later, since the river speeds up slowly that far in).
+        /// </summary>
+        public float waveSurgeSpeedStep = 0f;
+        /// <summary>Big waves in one set (well spaced, see SpawnManager.SurgeWaveSpacing).</summary>
+        public int waveSurgeCount = 2;
+        /// <summary>River speed every big wave takes away for good (it then builds up again with distance).</summary>
+        public float waveSpeedDrop = 35f;
+
         [Header("Power")]
         public float powerPerFood = 12f;
         public float maxPower = 100f;

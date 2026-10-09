@@ -19,6 +19,14 @@ namespace Upstream.River
         private float currentBaseSpeed = 150f;
         private float slowdownTimer;
         private bool isTurbo;
+        // River speed taken away for good by big waves; the distance curve keeps climbing on top of it.
+        private float speedRelief;
+        // Base speed at which the next set of big waves rolls in.
+        private float nextSurgeSpeed = 260f;
+
+        /// <summary>River speed (before turbo and slowdowns) the distance curve currently aims for.</summary>
+        public float BaseSpeed => currentBaseSpeed;
+        public float SpeedRelief => speedRelief;
 
         public GameConfig Config
         {
@@ -56,6 +64,7 @@ namespace Upstream.River
             if (scaler == null) scaler = FindFirstObjectByType<DifficultyScaler>();
             if (scoreSystem == null) scoreSystem = FindFirstObjectByType<ScoreSystem>();
             currentBaseSpeed = Config.startSpeed;
+            nextSurgeSpeed = Config.waveSurgeSpeed;
         }
 
         private void OnEnable()
@@ -82,6 +91,19 @@ namespace Upstream.River
             slowdownTimer = Mathf.Max(slowdownTimer, duration);
         }
 
+        /// <summary>A big wave rolled over the fish: the river loses some speed for good, plus a short jolt.</summary>
+        public void ApplyBigWave()
+        {
+            speedRelief += Config.waveSpeedDrop;
+            ApplySlowdown(0.5f);
+        }
+
+        /// <summary>
+        /// Speed the river eases toward: the distance curve minus what big waves took away, never below the start speed.
+        /// </summary>
+        public static float TargetSpeed(float meters, float startSpeed, float maxSpeed, float relief) =>
+            Mathf.Max(startSpeed, DifficultyScaler.SpeedForDistance(meters, startSpeed, maxSpeed) - Mathf.Max(0f, relief));
+
         private void Update()
         {
             if (GameManager.Instance == null) return;
@@ -93,8 +115,18 @@ namespace Upstream.River
             {
                 // Steps up every few hundred meters; each step is eased in over about a second so it never jolts.
                 float meters = Config.distanceToMetersDivisor > 0f ? GameManager.Instance.CurrentDistance / Config.distanceToMetersDivisor : 0f;
-                float target = DifficultyScaler.SpeedForDistance(meters, Config.startSpeed, Config.maxSpeed);
-                currentBaseSpeed = Mathf.MoveTowards(currentBaseSpeed, target, 15f * Time.deltaTime);
+                float target = TargetSpeed(meters, Config.startSpeed, Config.maxSpeed, speedRelief);
+                // Speeds up gently; a big wave's slowdown is felt quickly.
+                float rate = target < currentBaseSpeed ? 45f : 15f;
+                currentBaseSpeed = Mathf.MoveTowards(currentBaseSpeed, target, rate * Time.deltaTime);
+
+                // Very fast, far into the run: send a set of big waves; the next set waits until the river is
+                // back at this speed.
+                if (meters >= Config.waveSurgeFromMeters && currentBaseSpeed >= nextSurgeSpeed)
+                {
+                    nextSurgeSpeed = currentBaseSpeed + Mathf.Max(1f, Config.waveSurgeSpeedStep);
+                    GameEvents.OnWaveSurge?.Invoke();
+                }
             }
 
             float flow = GetFlowSpeed();
@@ -137,6 +169,8 @@ namespace Upstream.River
             currentBaseSpeed = Config.startSpeed;
             slowdownTimer = 0f;
             isTurbo = false;
+            speedRelief = 0f;
+            nextSurgeSpeed = Config.waveSurgeSpeed;
         }
     }
 }
