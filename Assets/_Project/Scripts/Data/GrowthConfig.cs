@@ -24,10 +24,10 @@ namespace Upstream.Data
         public GrowthStage[] stages = new GrowthStage[5]
         {
             new GrowthStage { stageName = "Fry",    sizeMultiplier = 1.0f, foodRequired = 0,   canEatSmallSharks = false, canEatSmallSharksWithoutTurbo = false, canEatLargeSharks = false, smallRockImmune = false, powerBarFillMultiplier = 1.0f,  hitboxMultiplier = 1.0f, healOnStageUp = false },
-            new GrowthStage { stageName = "Young",  sizeMultiplier = 1.3f, foodRequired = 15,  canEatSmallSharks = false, canEatSmallSharksWithoutTurbo = false, canEatLargeSharks = false, smallRockImmune = true,  powerBarFillMultiplier = 0.85f, hitboxMultiplier = 1.25f, healOnStageUp = true },
-            new GrowthStage { stageName = "Adult",  sizeMultiplier = 1.6f, foodRequired = 35,  canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = false, canEatLargeSharks = false, smallRockImmune = true,  powerBarFillMultiplier = 0.72f, hitboxMultiplier = 1.5f, healOnStageUp = true },
-            new GrowthStage { stageName = "Alpha",  sizeMultiplier = 2.0f, foodRequired = 60,  canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = true,  canEatLargeSharks = true,  smallRockImmune = true,  powerBarFillMultiplier = 0.61f, hitboxMultiplier = 1.8f, healOnStageUp = true },
-            new GrowthStage { stageName = "Titan",  sizeMultiplier = 2.5f, foodRequired = 100, canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = true,  canEatLargeSharks = true,  smallRockImmune = true,  powerBarFillMultiplier = 0.52f, hitboxMultiplier = 2.2f, healOnStageUp = true }
+            new GrowthStage { stageName = "Young",  sizeMultiplier = 1.3f, foodRequired = 30,  canEatSmallSharks = false, canEatSmallSharksWithoutTurbo = false, canEatLargeSharks = false, smallRockImmune = true,  powerBarFillMultiplier = 0.85f, hitboxMultiplier = 1.25f, healOnStageUp = true },
+            new GrowthStage { stageName = "Adult",  sizeMultiplier = 1.6f, foodRequired = 75,  canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = false, canEatLargeSharks = false, smallRockImmune = true,  powerBarFillMultiplier = 0.72f, hitboxMultiplier = 1.5f, healOnStageUp = true },
+            new GrowthStage { stageName = "Alpha",  sizeMultiplier = 2.0f, foodRequired = 135, canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = true,  canEatLargeSharks = true,  smallRockImmune = true,  powerBarFillMultiplier = 0.61f, hitboxMultiplier = 1.8f, healOnStageUp = true },
+            new GrowthStage { stageName = "Titan",  sizeMultiplier = 2.5f, foodRequired = 220, canEatSmallSharks = true,  canEatSmallSharksWithoutTurbo = true,  canEatLargeSharks = true,  smallRockImmune = true,  powerBarFillMultiplier = 0.52f, hitboxMultiplier = 2.2f, healOnStageUp = true }
         };
 
         [Header("Persistent progression")]

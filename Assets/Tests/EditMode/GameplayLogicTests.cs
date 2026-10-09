@@ -28,8 +28,8 @@ namespace Upstream.Tests
             Assert.IsTrue(health.TakeDamage());
             Assert.AreEqual(2, health.CurrentHP);
 
-            // 15 food -> Young, which has healOnStageUp = true
-            for (int i = 0; i < 15; i++) growth.OnFoodEaten(false);
+            // Enough food for Young, which has healOnStageUp = true
+            for (int i = 0; i < growth.Config.stages[1].foodRequired; i++) growth.OnFoodEaten(false);
 
             Assert.AreEqual(1, growth.CurrentStage);
             Assert.AreEqual(3, health.CurrentHP, "Reaching a new stage should restore one heart.");

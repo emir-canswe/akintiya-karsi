@@ -70,8 +70,8 @@ namespace Upstream.Tests
             Assert.AreEqual(0, growth.CurrentStage);
             Assert.IsFalse(growth.CanEatShark(false, true));
 
-            // Eat 35 food -> should reach Stage 2 (Adult: 35 food)
-            for (int i = 0; i < 35; i++)
+            // Eat up to the Adult threshold -> Stage 2
+            for (int i = 0; i < config.stages[2].foodRequired; i++)
             {
                 growth.OnFoodEaten(false);
             }
@@ -80,8 +80,8 @@ namespace Upstream.Tests
             Assert.IsTrue(growth.CanEatShark(false, true), "Adult should eat small sharks with Turbo");
             Assert.IsFalse(growth.CanEatShark(false, false), "Adult should NOT eat small sharks without Turbo");
 
-            // Eat 25 more food (total 60) -> Stage 3 (Alpha: 60 food)
-            for (int i = 0; i < 25; i++)
+            // Eat up to the Alpha threshold -> Stage 3
+            for (int i = config.stages[2].foodRequired; i < config.stages[3].foodRequired; i++)
             {
                 growth.OnFoodEaten(false);
             }

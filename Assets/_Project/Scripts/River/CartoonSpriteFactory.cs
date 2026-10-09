@@ -29,6 +29,16 @@ namespace Upstream.River
         }
 
         private static float Frac(float v) => v - Mathf.Floor(v);
+
+        /// <summary>
+        /// GLSL-style smoothstep: 0 below <paramref name="edge0"/>, 1 above <paramref name="edge1"/>, smooth between.
+        /// (Unity's Mathf.SmoothStep interpolates between two values instead, which is not what masks need.)
+        /// </summary>
+        private static float Smooth(float edge0, float edge1, float x)
+        {
+            float t = Mathf.Clamp01((x - edge0) / (edge1 - edge0));
+            return t * t * (3f - 2f * t);
+        }
         private static float Hash(float x, float y) => Frac(Mathf.Sin(x * 127.1f + y * 311.7f) * 43758.547f);
 
         private static float SdCircle(Vector2 p, Vector2 c, float r) => (p - c).magnitude - r;
@@ -335,63 +345,101 @@ namespace Upstream.River
         }
 
         /// <summary>
-        /// Cartoon shark seen from above, nose pointing down (it swims toward the player): blue back,
-        /// big angry-but-cute eyes, little teeth.
+        /// Shark seen from above, nose pointing down (it swims toward the player). Streamlined torpedo body,
+        /// slate-blue back over a pale belly rim (countershading), gill slits, a shaded dorsal fin, swept-back
+        /// pectoral fins and small sharp eyes. The tail is a separate sprite (<see cref="GetSharkTail"/>).
         /// </summary>
         public static Sprite GetShark()
         {
             if (shark != null) return shark;
             const int w = 96, h = 128;
             Vector2 c = new Vector2(48f, h * 0.46f);
-            Color back = Hex("#3F72C9"), side = Hex("#78ACF2"), fin = Hex("#3563B5"), outline = Hex("#16305E");
+            float noseY = c.y - 47f, tailY = c.y + 36f;
+            Color spine = Hex("#34557F"), back = Hex("#4C74A6"), side = Hex("#7FA4D3"), belly = Hex("#DCEBFA");
+            Color finDark = Hex("#2E4C74"), finLit = Hex("#5B82B6"), gill = Hex("#22395C"), outline = Hex("#122746");
 
-            float Body(Vector2 p) => SdEllipse(p, c, new Vector2(19f, 44f));
+            // Torpedo profile: half-width along the body (0 at the nose, 1 at the tail base).
+            float HalfWidth(float t)
+            {
+                t = Mathf.Clamp01(t);
+                return 18.5f * Mathf.Pow(t, 0.5f) * Mathf.Pow(1f - t, 0.7f) / 0.4432f;
+            }
+            float Body(Vector2 p)
+            {
+                float t = (p.y - noseY) / (tailY - noseY);
+                if (t < 0f) return (p - new Vector2(c.x, noseY)).magnitude;
+                if (t > 1f) return (p - new Vector2(c.x, tailY)).magnitude;
+                return Mathf.Abs(p.x - c.x) - HalfWidth(t);
+            }
+            float BodyY(float t) => Mathf.Lerp(noseY, tailY, t);
+            // Pectoral fins: long, swept back toward the tail.
+            Vector2 finR = new Vector2(c.x + 21f, BodyY(0.42f) + 7f), finL = new Vector2(c.x - 21f, BodyY(0.42f) + 7f);
             float Fins(Vector2 p)
             {
-                float l = SdEllipse(Rotate(p, c + new Vector2(-19f, -4f), -35f), c + new Vector2(-19f, -4f), new Vector2(15f, 5.5f));
-                float r = SdEllipse(Rotate(p, c + new Vector2(19f, -4f), 35f), c + new Vector2(19f, -4f), new Vector2(15f, 5.5f));
-                return Mathf.Min(l, r);
+                float r = SdEllipse(Rotate(p, finR, -32f), finR, new Vector2(15f, 5f));
+                float l = SdEllipse(Rotate(p, finL, 32f), finL, new Vector2(15f, 5f));
+                return Mathf.Min(r, l);
             }
-            // The tail is a separate sprite (GetSharkTail) so it can beat on its own.
-            Sdf sdf = p => SmoothMin(Body(p), Fins(p), 3f);
+
+            Sdf sdf = p => SmoothMin(Body(p), Fins(p), 4f);
             Fill fill = (p, d) =>
             {
+                float t = Mathf.Clamp01((p.y - noseY) / (tailY - noseY));
+                float hw = Mathf.Max(HalfWidth(t), 0.01f);
+                float across = Mathf.Abs(p.x - c.x) / hw; // 0 spine .. 1 rim
+
                 Color col;
-                if (Body(p) > 0f) col = fin;
+                if (Body(p) > 0f)
+                {
+                    // Fin: darker root, lighter leading edge
+                    col = Color.Lerp(finDark, finLit, Mathf.Clamp01((p.y - (finR.y - 6f)) / 12f));
+                }
                 else
                 {
-                    float sideAmt = Mathf.Clamp01(Mathf.Abs(p.x - c.x) / 16f);
-                    col = Color.Lerp(back, side, sideAmt * sideAmt);
-                    // Dorsal fin ridge
-                    if (Mathf.Abs(p.x - c.x) < Mathf.Lerp(4f, 0.8f, Mathf.Clamp01((p.y - c.y + 6f) / 22f)) && p.y > c.y - 6f && p.y < c.y + 16f)
-                        col = Hex("#244F99");
-                }
-                // Eyes near the nose (bottom)
-                for (int k = -1; k <= 1; k += 2)
-                {
-                    Vector2 eye = c + new Vector2(9.5f * k, -26f);
-                    float e = SdEllipse(p, eye, new Vector2(5f, 5.5f));
-                    if (e < 0f)
+                    // Countershading: dark spine -> lighter flanks -> pale belly peeking at the rim
+                    col = Color.Lerp(spine, back, Smooth(0f, 0.45f, across));
+                    col = Color.Lerp(col, side, Smooth(0.45f, 0.85f, across));
+                    col = Color.Lerp(col, belly, Smooth(0.86f, 1f, across) * 0.8f);
+                    // Lighter snout
+                    col = Color.Lerp(col, side, Mathf.Clamp01((0.18f - t) / 0.18f) * 0.6f);
+
+                    // Dorsal fin: narrow shaded wedge on the spine with a lit edge
+                    float dt = (t - 0.46f) / 0.26f;
+                    if (dt > 0f && dt < 1f)
                     {
-                        col = e > -1.1f ? outline : Color.white;
-                        Vector2 pupil = eye + new Vector2(-1.5f * k, -1.6f);
-                        if ((p - pupil).magnitude < 2.6f) col = Hex("#10142A");
-                        if ((p - (pupil + new Vector2(-0.8f, 0.9f))).magnitude < 0.8f) col = Color.white;
+                        float half = 5f * (1f - dt);
+                        float dx = p.x - c.x;
+                        if (Mathf.Abs(dx) < half) col = dx < -half * 0.35f ? finLit : finDark;
                     }
-                    // Angry brow slanting toward the middle
-                    Vector2 b0 = eye + new Vector2(-5.5f * k, 6.5f), b1 = eye + new Vector2(4.5f * k, 3.5f);
-                    Vector2 ab = b1 - b0;
-                    float t = Mathf.Clamp01(Vector2.Dot(p - b0, ab) / ab.sqrMagnitude);
-                    if ((p - (b0 + ab * t)).magnitude < 1.3f) col = outline;
+
+                    // Gill slits: three short curved lines on each flank
+                    for (int g = 0; g < 3; g++)
+                    {
+                        float gt = 0.28f + g * 0.045f;
+                        float gy = BodyY(gt);
+                        float gx = HalfWidth(gt) * 0.72f;
+                        for (int k = -1; k <= 1; k += 2)
+                        {
+                            Vector2 q = p - new Vector2(c.x + gx * k, gy);
+                            if (Mathf.Abs(q.y - q.x * q.x * 0.04f) < 0.7f && Mathf.Abs(q.x) < 3.2f) col = gill;
+                        }
+                    }
+
+                    // Eyes: small, dark, with a glint, set back from the snout
+                    for (int k = -1; k <= 1; k += 2)
+                    {
+                        float et = 0.17f;
+                        Vector2 eye = new Vector2(c.x + HalfWidth(et) * 0.62f * k, BodyY(et));
+                        float e = SdEllipse(p, eye, new Vector2(2.6f, 3.1f));
+                        if (e < 0f) col = Hex("#0B1426");
+                        if ((p - (eye + new Vector2(-0.8f * k, 0.9f))).magnitude < 0.75f) col = Color.white;
+                        // Faint brow ridge shadow above the eye
+                        if (e > 0f && e < 1.4f && p.y > eye.y) col = Color.Lerp(col, spine, 0.5f);
+                    }
                 }
-                // Mouth with tiny teeth at the nose
-                Vector2 m = p - (c + new Vector2(0f, -37f));
-                if (Mathf.Abs(m.y + m.x * m.x * 0.02f) < 1.1f && Mathf.Abs(m.x) < 8f) col = outline;
-                if (m.y < -0.5f && m.y > -3.5f && Mathf.Abs(m.x) < 7f && Mathf.Abs(Frac(m.x / 3.5f) - 0.5f) * 3.5f < (m.y + 3.5f) * 0.6f)
-                    col = Color.white;
-                return Shine(col, p, c + new Vector2(-7f, 18f), 9f, 0.35f);
+                return Shine(col, p, new Vector2(c.x - 6f, c.y + 10f), 10f, 0.25f);
             };
-            shark = ToSprite(Paint(w, h, sdf, fill, outline, 2.3f), new Vector2(0.5f, 0.46f), 1.15f);
+            shark = ToSprite(Paint(w, h, sdf, fill, outline, 2.1f), new Vector2(0.5f, 0.46f), 1.15f);
             return shark;
         }
 
@@ -439,13 +487,15 @@ namespace Upstream.River
             if (sharkTail != null) return sharkTail;
             const int w = 52, h = 48;
             Vector2 b = new Vector2(26f, 2f); // attachment point
-            Color fin = Hex("#3563B5"), finLit = Hex("#4A7CC9"), outline = Hex("#16305E");
+            Color fin = Hex("#2E4C74"), finLit = Hex("#5B82B6"), outline = Hex("#122746");
             Sdf sdf = p =>
             {
-                float stalk = SdEllipse(p, b + new Vector2(0f, 12f), new Vector2(6f, 13f));
-                float l = SdEllipse(Rotate(p, b + new Vector2(-8f, 25f), 35f), b + new Vector2(-8f, 25f), new Vector2(5f, 14f));
-                float r = SdEllipse(Rotate(p, b + new Vector2(8f, 25f), -35f), b + new Vector2(8f, 25f), new Vector2(5f, 14f));
-                return SmoothMin(stalk, Mathf.Min(l, r), 2f);
+                // Stalk flowing into two swept lobes (a forked crescent), blended into one shape
+                float stalk = SdEllipse(p, b + new Vector2(0f, 12f), new Vector2(5.5f, 13f));
+                Vector2 lc = b + new Vector2(-7f, 24f), rc = b + new Vector2(7f, 24f);
+                float l = SdEllipse(Rotate(p, lc, 38f), lc, new Vector2(5.5f, 15f));
+                float r = SdEllipse(Rotate(p, rc, -38f), rc, new Vector2(5.5f, 15f));
+                return SmoothMin(stalk, SmoothMin(l, r, 6f), 9f);
             };
             Fill fill = (p, d) => p.x < b.x ? finLit : fin;
             sharkTail = ToSprite(Paint(w, h, sdf, fill, outline, 2.3f), new Vector2(0.5f, b.y / h), 1.15f);
@@ -706,7 +756,7 @@ namespace Upstream.River
                 for (int x = 0; x < w; x++)
                 {
                     float t = Mathf.Abs((x + 0.5f) / w - 0.5f) * 2f; // 0 center .. 1 edge
-                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, 1f - Mathf.SmoothStep(0.15f, 1f, t)));
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, 1f - Smooth(0.15f, 1f, t)));
                 }
             tex.Apply();
             waterGlow = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
@@ -733,8 +783,8 @@ namespace Upstream.River
                     float u = wx / 128f, v = wy / 128f;
                     float n = Mathf.Sin(tau * (u * 2f + Mathf.Sin(tau * v * 3f) * 0.2f)) * Mathf.Sin(tau * (v * 3f + Mathf.Sin(tau * u * 2f) * 0.2f));
                     // Soft patches of lighter and darker grass
-                    Color col = Color.Lerp(baseC, lightC, Mathf.SmoothStep(0.3f, 0.6f, n));
-                    col = Color.Lerp(col, darkC, Mathf.SmoothStep(-0.4f, -0.7f, n));
+                    Color col = Color.Lerp(baseC, lightC, Smooth(0.3f, 0.6f, n));
+                    col = Color.Lerp(col, darkC, Smooth(-0.4f, -0.7f, n));
 
                     // Grass tufts: a little three-blade "v", one per cell at a hashed spot
                     int cx = (int)(wx / cell), cy = (int)(wy / cell);
@@ -802,7 +852,7 @@ namespace Upstream.River
                     }
 
                     // Wet sand near the water, then foam, then foam fading into the water
-                    col = Color.Lerp(col, wet, Mathf.SmoothStep(foamLine - 6f, foamLine - 1f, wx));
+                    col = Color.Lerp(col, wet, Smooth(foamLine - 6f, foamLine - 1f, wx));
                     float foam = Mathf.Clamp01((wx - foamLine) * 2f) * Mathf.Clamp01((foamLine + 2.8f - wx) * 2f);
                     col = Color.Lerp(col, Color.white, foam);
                     if (wx > foamLine + 2.8f)

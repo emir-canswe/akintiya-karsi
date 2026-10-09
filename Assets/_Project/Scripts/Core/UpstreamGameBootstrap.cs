@@ -407,13 +407,18 @@ namespace Upstream.Core
             menuDimObj.transform.SetSiblingIndex(safeObj.transform.GetSiblingIndex());
             Image menuDim = menuDimObj.AddComponent<Image>();
             menuDim.sprite = whiteSpr;
-            menuDim.color = new Color(0.02f, 0.10f, 0.30f, 0.30f); // light blue veil: the colorful river stays visible
+            menuDim.color = new Color(0.02f, 0.10f, 0.30f, 0.16f); // light blue veil: the colorful river stays visible
 
             GameObject menuObj = CreateUIRect("MainMenu", safeRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             MainMenuScreen mainMenu = menuObj.AddComponent<MainMenuScreen>();
 
             // Logo-style title
-            TMP_Text titleText = CreateLabel("Title", menuObj.transform, new Vector2(0.5f, 0.80f), new Vector2(0.5f, 0.80f), Vector2.zero, new Vector2(330f, 140f), "", 58f, TextAlignmentOptions.Center, FontStyles.Bold);
+            TMP_Text titleText = CreateLabel("Title", menuObj.transform, new Vector2(0.5f, 0.80f), new Vector2(0.5f, 0.80f), Vector2.zero, new Vector2(300f, 140f), "", 58f, TextAlignmentOptions.Center, FontStyles.Bold);
+            // Each line ("SWIM" / "UPSTREAM") stays whole: shrink to fit instead of wrapping mid-word.
+            titleText.textWrappingMode = TextWrappingModes.NoWrap;
+            titleText.enableAutoSizing = true;
+            titleText.fontSizeMin = 30f;
+            titleText.fontSizeMax = 58f;
             SetOutline(titleText, 0.35f);
             Localize(titleText, "title");
 

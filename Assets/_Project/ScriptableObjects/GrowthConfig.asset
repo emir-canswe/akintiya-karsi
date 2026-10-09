@@ -25,7 +25,7 @@ MonoBehaviour:
     healOnStageUp: 0
   - stageName: Young
     sizeMultiplier: 1.3
-    foodRequired: 15
+    foodRequired: 30
     canEatSmallSharks: 0
     canEatSmallSharksWithoutTurbo: 0
     canEatLargeSharks: 0
@@ -35,7 +35,7 @@ MonoBehaviour:
     healOnStageUp: 1
   - stageName: Adult
     sizeMultiplier: 1.6
-    foodRequired: 35
+    foodRequired: 75
     canEatSmallSharks: 1
     canEatSmallSharksWithoutTurbo: 0
     canEatLargeSharks: 0
@@ -45,7 +45,7 @@ MonoBehaviour:
     healOnStageUp: 1
   - stageName: Alpha
     sizeMultiplier: 2
-    foodRequired: 60
+    foodRequired: 135
     canEatSmallSharks: 1
     canEatSmallSharksWithoutTurbo: 1
     canEatLargeSharks: 1
@@ -55,7 +55,7 @@ MonoBehaviour:
     healOnStageUp: 1
   - stageName: Titan
     sizeMultiplier: 2.5
-    foodRequired: 100
+    foodRequired: 220
     canEatSmallSharks: 1
     canEatSmallSharksWithoutTurbo: 1
     canEatLargeSharks: 1

@@ -230,7 +230,7 @@ namespace Upstream.Spawning
             float side = Random.value < 0.5f ? -1f : 1f;
 
             // Now and then a wave rolls down the river instead of the usual pattern.
-            if (wavePool != null && Random.value < Mathf.Lerp(0.07f, 0.14f, difficulty))
+            if (wavePool != null && Random.value < Mathf.Lerp(0.11f, 0.18f, difficulty))
             {
                 SpawnWave(rw, startY, side);
                 return;
