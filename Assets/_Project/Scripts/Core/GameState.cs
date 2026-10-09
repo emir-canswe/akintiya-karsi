@@ -28,8 +28,8 @@ namespace Upstream.Core
         public static Action<int> OnPlayerHurt;
         /// <summary>Fired whenever HP changes for any reason: damage, heal, reset, continue (arg: current HP).</summary>
         public static Action<int> OnHealthChanged;
-        /// <summary>Fired after a gold food is resolved: true = healed a heart, false = HP was full so it became power.</summary>
-        public static Action<bool> OnGoldFoodResolved;
+        /// <summary>Fired after a gold food is resolved with the health it gave back; 0 = HP was full so it became power.</summary>
+        public static Action<int> OnGoldFoodResolved;
         public static Action OnPlayerDied;
         public static Action OnTurboStart;
         public static Action OnTurboEnd;

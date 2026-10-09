@@ -12,10 +12,17 @@ namespace Upstream.Data
         public float playerMoveSmoothing = 12f;
         public float turboSpeedMultiplier = 1.7f;
         public float turboTime = 3.2f;
-        public int maxHP = 3;
+        /// <summary>One health bar; each hit takes a HitDamage amount from it.</summary>
+        public int maxHP = 100;
         public float invincibilityDuration = 1.3f;
-        public int continueHP = 2;
+        public int continueHP = 50;
         public float continueInvincibility = 2.2f;
+        /// <summary>Health a gold shrimp gives back: kept small so hits really matter.</summary>
+        public int goldFoodHeal = 10;
+        /// <summary>Health given back on reaching a new growth stage (stages with healOnStageUp).</summary>
+        public int stageUpHeal = 10;
+        /// <summary>Extra max health from a legendary fish (FishDef.extraHeart).</summary>
+        public int legendaryBonusHP = 25;
 
         [Header("Power")]
         public float powerPerFood = 12f;

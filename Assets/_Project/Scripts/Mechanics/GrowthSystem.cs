@@ -94,7 +94,7 @@ namespace Upstream.Mechanics
 
                 if (CurrentStageData != null && CurrentStageData.healOnStageUp && Health != null)
                 {
-                    Health.Heal(1);
+                    Health.Heal(Health.Config.stageUpHeal);
                 }
             }
         }

@@ -14,11 +14,11 @@ namespace Upstream.Mechanics
         private const float GoldOverflowPowerFoods = 3f;
         private const float ResumeGraceSeconds = 1f;
 
-        private int currentHP = 3;
+        private int currentHP = 100;
         private float invincibilityTimer;
         private TurboSystem turboSystem;
-        // +1 heart from a legendary fish; refreshed at the start of every run.
-        private int bonusHearts;
+        // Extra max health from a legendary fish; refreshed at the start of every run.
+        private int bonusHP;
         private int shieldCharges;
 
         /// <summary>Hits the shield ability will still block this run.</summary>
@@ -41,7 +41,8 @@ namespace Upstream.Mechanics
 
         public int CurrentHP => currentHP;
         public bool IsInvincible => invincibilityTimer > 0f;
-        public int MaxHP => Config.maxHP + bonusHearts;
+        public int MaxHP => Config.maxHP + bonusHP;
+        public float HealthPercent => MaxHP > 0 ? (float)currentHP / MaxHP : 0f;
 
         // Resolved lazily: the bootstrap adds TurboSystem after HealthSystem, so it doesn't exist yet in Awake.
         private TurboSystem Turbo
@@ -86,13 +87,14 @@ namespace Upstream.Mechanics
         {
             if (!isGold) return;
 
-            bool healed = Heal(1);
+            int before = currentHP;
+            bool healed = Heal(Config.goldFoodHeal);
             if (!healed && Turbo != null)
             {
                 // Full health: the rare gold shrimp shouldn't be wasted, turn it into a big power boost.
                 Turbo.AddPower(Config.powerPerFood * GoldOverflowPowerFoods);
             }
-            GameEvents.OnGoldFoodResolved?.Invoke(healed);
+            GameEvents.OnGoldFoodResolved?.Invoke(currentHP - before);
         }
 
         private void HandleGameResume()
@@ -111,30 +113,31 @@ namespace Upstream.Mechanics
         public void ResetHealth()
         {
             FishDef fish = FishShop.Active;
-            bonusHearts = fish.extraHeart ? 1 : 0;
+            bonusHP = fish.extraHeart ? Config.legendaryBonusHP : 0;
             shieldCharges = fish.ShieldCharges;
             currentHP = MaxHP;
             invincibilityTimer = 0f;
             GameEvents.OnHealthChanged?.Invoke(currentHP);
         }
 
-        public bool TakeDamage()
+        /// <summary>Takes <paramref name="amount"/> health (see HitDamage). Returns true if the hit landed.</summary>
+        public bool TakeDamage(int amount)
         {
             // Already dead: a second hazard touched in the same frame must not hurt (sound/vibration) again.
-            if (currentHP <= 0) return false;
+            if (currentHP <= 0 || amount <= 0) return false;
             if (IsInvincible) return false;
             if (Turbo != null && Turbo.IsTurboActive) return false;
 
             if (shieldCharges > 0)
             {
-                // Shield ability soaks the hit: no heart lost, short grace period.
+                // Shield ability soaks the hit: no health lost, short grace period.
                 shieldCharges--;
                 SetInvincible(1f);
                 GameEvents.OnShieldBlocked?.Invoke(shieldCharges);
                 return false;
             }
 
-            currentHP = Mathf.Max(0, currentHP - 1);
+            currentHP = Mathf.Max(0, currentHP - amount);
             GameEvents.OnPlayerHurt?.Invoke(currentHP);
             GameEvents.OnHealthChanged?.Invoke(currentHP);
 

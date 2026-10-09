@@ -12,7 +12,9 @@ namespace Upstream.UI
     public class HUDController : MonoBehaviour
     {
         [SerializeField] private TMP_Text distanceText;
-        [SerializeField] private Image[] heartIcons;
+        [SerializeField] private Image heartIcon;
+        [SerializeField] private Image healthFill;
+        [SerializeField] private Image healthGhost;
         [SerializeField] private Image powerBarFill;
         [SerializeField] private GameObject powerBarContainer;
         [SerializeField] private GameObject turboGlowEffect;
@@ -23,6 +25,20 @@ namespace Upstream.UI
         private RectTransform coinPill;
         private int shownCoins;
         private float coinPopTime = 1f;
+
+        // Health bar animation: the fill drops at once on a hit, a pale "ghost" shows the chunk that was
+        // lost and drains after a short hold; heals fill up smoothly.
+        private const float GhostHold = 0.35f;
+        private const float GhostDrainPerSecond = 0.7f;
+        private const float HealFillPerSecond = 0.6f;
+        private const float LowHealth = 0.3f;
+        private static readonly Color HealthColor = new Color(1f, 0.36f, 0.42f, 1f);
+        private static readonly Color LowHealthColor = new Color(1f, 0.16f, 0.2f, 1f);
+        private float healthTarget = 1f;
+        private float healthShown = 1f;
+        private float ghostShown = 1f;
+        private float ghostHoldTimer;
+        private float heartPopTime = 1f;
 
         /// <summary>Optional coin counter (coins picked up this run); <paramref name="pill"/> bounces on every pickup.</summary>
         public void SetCoinCounter(TMP_Text label, RectTransform pill = null)
@@ -35,7 +51,9 @@ namespace Upstream.UI
 
         public void Configure(
             TMP_Text distText,
-            Image[] hearts,
+            Image heart,
+            Image healthBarFill,
+            Image healthBarGhost,
             Image powerFill,
             GameObject powerContainer,
             GameObject turboGlow,
@@ -43,7 +61,9 @@ namespace Upstream.UI
             TurboSystem turbo)
         {
             distanceText = distText;
-            heartIcons = hearts;
+            heartIcon = heart;
+            healthFill = healthBarFill;
+            healthGhost = healthBarGhost;
             powerBarFill = powerFill;
             powerBarContainer = powerContainer;
             turboGlowEffect = turboGlow;
@@ -106,6 +126,13 @@ namespace Upstream.UI
                 coinPill.localScale = new Vector3(s, s, 1f);
             }
 
+            // Only touch the bar while something moves, so an idle HUD doesn't rebuild its canvas every frame.
+            bool lowHealth = healthTarget > 0f && healthTarget <= LowHealth;
+            if (healthShown != healthTarget || ghostShown != healthShown || heartPopTime < 1f || lowHealth)
+            {
+                AnimateHealthBar(Time.unscaledDeltaTime);
+            }
+
             if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Playing)
             {
                 if (turboSystem == null) turboSystem = FindFirstObjectByType<TurboSystem>();
@@ -127,24 +154,47 @@ namespace Upstream.UI
 
         private void HandleHealthChanged(int currentHp)
         {
-            UpdateHearts(currentHp);
+            if (healthSystem == null) healthSystem = FindFirstObjectByType<HealthSystem>();
+            int maxHp = healthSystem != null ? healthSystem.MaxHP : 100;
+            float target = maxHp > 0 ? Mathf.Clamp01((float)currentHp / maxHp) : 0f;
+            if (target < healthTarget)
+            {
+                // Hit: the bar drops right away, the ghost marks how much it cost.
+                ghostShown = Mathf.Max(ghostShown, healthShown);
+                healthShown = target;
+                ghostHoldTimer = GhostHold;
+                heartPopTime = 0f;
+            }
+            healthTarget = target;
+            ApplyHealthBar();
         }
 
-        public void UpdateHearts(int hp)
+        private void AnimateHealthBar(float dt)
         {
-            if (heartIcons == null) return;
-            if (healthSystem == null) healthSystem = FindFirstObjectByType<HealthSystem>();
-            int maxHp = healthSystem != null ? healthSystem.MaxHP : 3;
-            for (int i = 0; i < heartIcons.Length; i++)
+            if (healthShown < healthTarget) healthShown = Mathf.MoveTowards(healthShown, healthTarget, HealFillPerSecond * dt);
+            if (ghostHoldTimer > 0f) ghostHoldTimer -= dt;
+            else if (ghostShown > healthShown) ghostShown = Mathf.MoveTowards(ghostShown, healthShown, GhostDrainPerSecond * dt);
+            if (ghostShown < healthShown) ghostShown = healthShown;
+            if (heartPopTime < 1f) heartPopTime = Mathf.Min(1f, heartPopTime + dt * 4f);
+            ApplyHealthBar();
+        }
+
+        private void ApplyHealthBar()
+        {
+            bool low = healthTarget > 0f && healthTarget <= LowHealth;
+            // Low health: the bar and heart throb so the danger is obvious at a glance.
+            float beat = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
+            if (healthFill != null)
             {
-                if (heartIcons[i] != null)
-                {
-                    // Extra heart slots (legendary fish) only show when that fish is worn.
-                    heartIcons[i].gameObject.SetActive(i < maxHp);
-                    heartIcons[i].color = i < hp
-                        ? new Color(1f, 0.36f, 0.42f, 1f)
-                        : new Color(0f, 0.12f, 0.18f, 0.45f);
-                }
+                healthFill.fillAmount = healthShown;
+                healthFill.color = low ? Color.Lerp(HealthColor, LowHealthColor, beat) : HealthColor;
+            }
+            if (healthGhost != null) healthGhost.fillAmount = ghostShown;
+            if (heartIcon != null)
+            {
+                float s = 1f + Mathf.Sin(heartPopTime * Mathf.PI) * 0.3f + beat * 0.12f;
+                heartIcon.rectTransform.localScale = new Vector3(s, s, 1f);
+                heartIcon.color = healthTarget > 0f ? HealthColor : new Color(0f, 0.12f, 0.18f, 0.45f);
             }
         }
 
@@ -167,10 +217,10 @@ namespace Upstream.UI
             }
         }
 
-        private void HandleGoldFoodResolved(bool healed)
+        private void HandleGoldFoodResolved(int healed)
         {
             if (toastUI == null) return;
-            if (healed) toastUI.Show(LocalizationManager.Get("heal_toast"), new Color(1f, 0.84f, 0.35f));
+            if (healed > 0) toastUI.Show(LocalizationManager.Format("heal_toast", healed), new Color(1f, 0.84f, 0.35f));
             else toastUI.Show(LocalizationManager.Get("power_toast"), new Color(0.49f, 0.94f, 0.78f));
         }
 
@@ -178,7 +228,11 @@ namespace Upstream.UI
         {
             gameObject.SetActive(true);
             if (turboGlowEffect != null) turboGlowEffect.SetActive(false);
-            // Hearts are refreshed by HealthSystem.ResetHealth -> OnHealthChanged.
+            // A new run starts with a full bar (HealthSystem.ResetHealth also raises OnHealthChanged).
+            healthTarget = healthShown = ghostShown = 1f;
+            ghostHoldTimer = 0f;
+            heartPopTime = 1f;
+            ApplyHealthBar();
             if (powerBarFill != null) powerBarFill.fillAmount = 0f;
             if (distanceText != null) distanceText.text = "0<size=50%>m</size>";
             if (runCoinsText != null) runCoinsText.text = "0";

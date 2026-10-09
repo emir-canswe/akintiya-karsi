@@ -17,10 +17,13 @@ MonoBehaviour:
   playerMoveSmoothing: 12
   turboSpeedMultiplier: 1.7
   turboTime: 3.2
-  maxHP: 3
+  maxHP: 100
   invincibilityDuration: 1.3
-  continueHP: 2
+  continueHP: 50
   continueInvincibility: 2.2
+  goldFoodHeal: 10
+  stageUpHeal: 10
+  legendaryBonusHP: 25
   powerPerFood: 12
   maxPower: 100
   riverHalfWidth: 150

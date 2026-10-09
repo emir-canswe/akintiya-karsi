@@ -8,6 +8,9 @@ namespace Upstream.Tests
 {
     public class GameplayLogicTests
     {
+        private static readonly System.Reflection.FieldInfo InvincibilityTimer = typeof(HealthSystem)
+            .GetField("invincibilityTimer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
         // --- Health / Growth interaction ---
 
         [Test]
@@ -25,14 +28,15 @@ namespace Upstream.Tests
             int startStage = growth.CurrentStage;
             Assume.That(startStage, Is.EqualTo(0), "Test assumes no unlocked start stage in the save file.");
 
-            Assert.IsTrue(health.TakeDamage());
-            Assert.AreEqual(2, health.CurrentHP);
+            Assert.IsTrue(health.TakeDamage(HitDamage.Shark));
+            Assert.AreEqual(health.MaxHP - HitDamage.Shark, health.CurrentHP);
 
             // Enough food for Young, which has healOnStageUp = true
             for (int i = 0; i < growth.Config.stages[1].foodRequired; i++) growth.OnFoodEaten(false);
 
             Assert.AreEqual(1, growth.CurrentStage);
-            Assert.AreEqual(3, health.CurrentHP, "Reaching a new stage should restore one heart.");
+            Assert.AreEqual(health.MaxHP - HitDamage.Shark + health.Config.stageUpHeal, health.CurrentHP,
+                "Reaching a new stage should give back a little health.");
 
             Object.DestroyImmediate(go);
         }
@@ -47,6 +51,57 @@ namespace Upstream.Tests
 
             Assert.IsFalse(health.Heal(1));
             Assert.AreEqual(health.MaxHP, health.CurrentHP);
+
+            Object.DestroyImmediate(go);
+        }
+
+        [Test]
+        public void Damage_DependsOnWhatHitYou_AndHealIsSmallAndCapped()
+        {
+            var go = new GameObject("TestPlayer");
+            var health = go.AddComponent<HealthSystem>();
+            health.Config = ScriptableObject.CreateInstance<GameConfig>();
+            health.ResetHealth();
+            Assume.That(health.MaxHP, Is.EqualTo(health.Config.maxHP), "Test assumes a non-legendary fish is worn.");
+
+            // A piranha nibble costs less than a catfish bite.
+            Assert.Less(HitDamage.ForPredator(PredatorKind.Piranha, false), HitDamage.ForPredator(PredatorKind.Shark, false));
+            Assert.Less(HitDamage.ForPredator(PredatorKind.Shark, false), HitDamage.ForPredator(PredatorKind.Shark, true));
+            Assert.Less(HitDamage.ForRock(true), HitDamage.ForRock(false));
+            Assert.AreEqual(HitDamage.Catfish, HitDamage.ForPredator(PredatorKind.Catfish, true));
+
+            Assert.IsTrue(health.TakeDamage(HitDamage.Piranha));
+            Assert.AreEqual(100 - HitDamage.Piranha, health.CurrentHP);
+            Assert.IsFalse(health.TakeDamage(HitDamage.Catfish), "Invincible right after a hit.");
+            Assert.AreEqual(100 - HitDamage.Piranha, health.CurrentHP);
+
+            // Gold shrimp gives back only a little, never above max.
+            Assert.IsTrue(health.Heal(health.Config.goldFoodHeal));
+            Assert.AreEqual(100 - HitDamage.Piranha + health.Config.goldFoodHeal, health.CurrentHP);
+            Assert.IsTrue(health.Heal(1000));
+            Assert.AreEqual(health.MaxHP, health.CurrentHP);
+
+            Object.DestroyImmediate(go);
+        }
+
+        [Test]
+        public void SeveralHits_EmptyTheBar()
+        {
+            var go = new GameObject("TestPlayer");
+            var health = go.AddComponent<HealthSystem>();
+            health.Config = ScriptableObject.CreateInstance<GameConfig>();
+            health.ResetHealth();
+
+            int hits = 0;
+            while (health.CurrentHP > 0 && hits < 20)
+            {
+                InvincibilityTimer.SetValue(health, 0f); // skip the grace period between hits
+                health.TakeDamage(HitDamage.Shark);
+                hits++;
+            }
+            Assert.AreEqual(0, health.CurrentHP);
+            Assert.AreEqual(Mathf.CeilToInt((float)health.MaxHP / HitDamage.Shark), hits);
+            Assert.IsFalse(health.TakeDamage(HitDamage.Shark), "No more hits once the bar is empty.");
 
             Object.DestroyImmediate(go);
         }

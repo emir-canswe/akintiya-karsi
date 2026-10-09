@@ -329,16 +329,36 @@ namespace Upstream.Core
             MakeSubCanvas(hudObj, interactive: true); // distance/coins change constantly: rebuild only the HUD
             HUDController hud = hudObj.AddComponent<HUDController>();
 
-            // Hearts (Top-Left)
-            Image[] heartImages = new Image[4];
-            for (int i = 0; i < heartImages.Length; i++)
-            {
-                GameObject hObj = CreateUIRect($"Heart_{i}", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f + i * 26f, -28f), new Vector2(23f, 23f));
-                Image img = hObj.AddComponent<Image>();
-                img.sprite = heartSpr;
-                img.color = new Color(1f, 0.30f, 0.40f, 1f);
-                heartImages[i] = img;
-            }
+            // Health bar (Top-Left): one bar that each hit takes a chunk out of, with a heart at its left end.
+            // Spans x 10..106, the same room the old heart row used, so it stays clear of the distance text.
+            GameObject healthBgObj = CreateUIRect("HealthBarBg", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(70f, -28f), new Vector2(72f, 14f));
+            Image healthBgImg = healthBgObj.AddComponent<Image>();
+            healthBgImg.sprite = WatercolorSpriteFactory.GetRoundedRectSprite();
+            healthBgImg.type = Image.Type.Sliced;
+            healthBgImg.color = new Color(0.07f, 0.12f, 0.33f, 0.6f);
+            healthBgImg.raycastTarget = false;
+
+            GameObject healthGhostObj = CreateUIRect("HealthBarGhost", healthBgObj.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-4f, -4f));
+            Image healthGhostImg = healthGhostObj.AddComponent<Image>();
+            healthGhostImg.sprite = CartoonSpriteFactory.GetBarFill();
+            healthGhostImg.color = new Color(1f, 0.93f, 0.85f, 0.85f);
+            healthGhostImg.type = Image.Type.Filled;
+            healthGhostImg.fillMethod = Image.FillMethod.Horizontal;
+            healthGhostImg.raycastTarget = false;
+
+            GameObject healthFillObj = CreateUIRect("HealthBarFill", healthBgObj.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-4f, -4f));
+            Image healthFillImg = healthFillObj.AddComponent<Image>();
+            healthFillImg.sprite = CartoonSpriteFactory.GetBarFill();
+            healthFillImg.color = new Color(1f, 0.36f, 0.42f, 1f);
+            healthFillImg.type = Image.Type.Filled;
+            healthFillImg.fillMethod = Image.FillMethod.Horizontal;
+            healthFillImg.raycastTarget = false;
+
+            GameObject heartObj = CreateUIRect("HealthHeart", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f, -28f), new Vector2(25f, 25f));
+            Image heartImg = heartObj.AddComponent<Image>();
+            heartImg.sprite = heartSpr;
+            heartImg.color = new Color(1f, 0.36f, 0.42f, 1f);
+            heartImg.raycastTarget = false;
 
             // Distance Text (Top-Center)
             TMP_Text distText = CreateLabel("DistanceText", hudObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -32f), new Vector2(220f, 52f), "0<size=50%>m</size>", 42f, TextAlignmentOptions.Center, FontStyles.Bold);
@@ -392,9 +412,9 @@ namespace Upstream.Core
             SetPrivateField(toastUI, "label", toastText);
             SetPrivateField(toastUI, "canvasGroup", toastCg);
 
-            hud.Configure(distText, heartImages, powerFillImg, powerBgObj, null, toastUI, turboSystem);
+            hud.Configure(distText, heartImg, healthFillImg, healthGhostImg, powerFillImg, powerBgObj, null, toastUI, turboSystem);
 
-            // Coins picked up this run: a small frosted pill under the hearts. Kept narrow (x 10..74) so it never
+            // Coins picked up this run: a small frosted pill under the health bar. Kept narrow (x 10..74) so it never
             // reaches the power bar, which starts around x = 79 on narrow phones (canvas ~326 wide).
             GameObject hudCoinPill = CreateUIRect("CoinPill", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(42f, -60f), new Vector2(64f, 26f));
             Image hudCoinBg = hudCoinPill.AddComponent<Image>();

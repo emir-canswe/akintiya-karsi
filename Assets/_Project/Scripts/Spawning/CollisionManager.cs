@@ -124,7 +124,7 @@ namespace Upstream.Spawning
                             }
                             else
                             {
-                                if (healthSystem != null && healthSystem.TakeDamage())
+                                if (healthSystem != null && healthSystem.TakeDamage(HitDamage.ForRock(rock.isSmall)))
                                 {
                                     gameCamera?.Shake(9f);
                                 }
@@ -182,7 +182,7 @@ namespace Upstream.Spawning
                             }
                             else
                             {
-                                if (healthSystem != null && healthSystem.TakeDamage())
+                                if (healthSystem != null && healthSystem.TakeDamage(HitDamage.ForPredator(sh.kind, sh.isLarge)))
                                 {
                                     gameCamera?.Shake(10f);
                                 }
@@ -209,7 +209,7 @@ namespace Upstream.Spawning
                             }
                             else
                             {
-                                if (healthSystem != null && healthSystem.TakeDamage())
+                                if (healthSystem != null && healthSystem.TakeDamage(HitDamage.Log))
                                 {
                                     gameCamera?.Shake(9f);
                                 }
@@ -250,7 +250,7 @@ namespace Upstream.Spawning
                             }
                             else
                             {
-                                if (healthSystem != null && healthSystem.TakeDamage())
+                                if (healthSystem != null && healthSystem.TakeDamage(HitDamage.Hook))
                                 {
                                     gameCamera?.Shake(9f);
                                 }
