@@ -91,7 +91,7 @@ namespace Upstream.UI
 
         private void HandleRunCoinsChanged(int coins)
         {
-            if (runCoinsText != null) runCoinsText.text = coins.ToString();
+            if (runCoinsText != null) runCoinsText.SetText("{0:0}", coins);
             if (coins > shownCoins) coinPopTime = 0f;
             shownCoins = coins;
         }
@@ -120,7 +120,8 @@ namespace Upstream.UI
         {
             if (distanceText != null)
             {
-                distanceText.text = $"{Mathf.FloorToInt(metersScore)}<size=50%>m</size>";
+                // SetText with an argument formats without allocating a new string (this runs every meter).
+                distanceText.SetText("{0:0}<size=50%>m</size>", Mathf.FloorToInt(metersScore));
             }
         }
 

@@ -57,6 +57,9 @@ namespace Upstream.Core
             }
             initialized = true;
             Application.targetFrameRate = 60;
+            // Collisions are computed by CollisionManager; Unity's physics would only simulate the idle player collider.
+            Physics2D.simulationMode = SimulationMode2D.Script;
+            Physics.simulationMode = SimulationMode.Script;
 
             BuildEntireGame();
 
@@ -323,6 +326,7 @@ namespace Upstream.Core
 
             // --- HUD ROOT ---
             GameObject hudObj = CreateUIRect("HUD", safeRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            MakeSubCanvas(hudObj, interactive: true); // distance/coins change constantly: rebuild only the HUD
             HUDController hud = hudObj.AddComponent<HUDController>();
 
             // Hearts (Top-Left)
@@ -787,6 +791,7 @@ namespace Upstream.Core
             bg.color = new Color(0.10f, 0.24f, 0.62f, 1f); // swallows taps meant for the menu below
             GameObject lightObj = CreateUIRect("Sunlight", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             RawImage sunlight = lightObj.AddComponent<RawImage>();
+            MakeSubCanvas(lightObj, interactive: false); // drifts every frame
             sunlight.texture = CartoonSpriteFactory.GetCaustics().texture;
             sunlight.color = new Color(1f, 1f, 1f, 0.10f);
             sunlight.raycastTarget = false;
@@ -857,6 +862,7 @@ namespace Upstream.Core
             previewGlow.sprite = WatercolorSpriteFactory.GetCircleGlowSprite();
             previewGlow.raycastTarget = false;
             FishPreview bigPreview = FishPreview.Create(stageObj.transform, Vector2.zero, 110f, true);
+            MakeSubCanvas(bigPreview.gameObject, interactive: false); // swims every frame; the 30 cards stay batched
             bigPreview.transform.localRotation = Quaternion.Euler(0f, 0f, -90f); // swims sideways across the tank
 
             TMP_Text nameText = CreateLabel("Name", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-40f, -142f), new Vector2(190f, 26f), "", 19f, TextAlignmentOptions.Left, FontStyles.Bold);
@@ -1034,6 +1040,18 @@ namespace Upstream.Core
         private static void Localize(TMP_Text label, string key)
         {
             label.gameObject.AddComponent<LocalizedText>().Key = key;
+        }
+
+        /// <summary>
+        /// Gives a constantly animated part of the UI its own canvas, so its changes don't make Unity rebuild the
+        /// whole screen's UI every frame.
+        /// </summary>
+        private static void MakeSubCanvas(GameObject go, bool interactive)
+        {
+            Canvas parent = go.GetComponentInParent<Canvas>();
+            Canvas sub = go.AddComponent<Canvas>();
+            if (parent != null) sub.additionalShaderChannels = parent.additionalShaderChannels;
+            if (interactive) go.AddComponent<GraphicRaycaster>();
         }
 
         private static GameObject CreateUIRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax, Vector2 anchoredPos, Vector2 sizeDelta)
