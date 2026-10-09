@@ -29,7 +29,7 @@ namespace Upstream.Core
         private static readonly Dictionary<string, Entry> Table = new Dictionary<string, Entry>
         {
             // Menu
-            { "title", new Entry("AKINTIYA\n<color=#FF8A5C>KARŞI</color>", "SWIM\n<color=#FF8A5C>UPSTREAM</color>") },
+            { "title", new Entry("BLUE'NUN\n<color=#FF8A5C>NEHRİ</color>", "BLUE'S\n<color=#FF8A5C>RIVER</color>") },
             { "tips_title", new Entry("NASIL OYNANIR?", "HOW TO PLAY") },
             { "tip_drag", new Entry("Sürükle", "Drag") },
             { "tip_eat", new Entry("Ye ve büyü", "Eat & grow") },

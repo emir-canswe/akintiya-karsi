@@ -138,7 +138,8 @@ namespace Upstream.EditorTools
 
             EditorUserBuildSettings.buildAppBundle = appBundle;
             PlayerSettings.companyName = "EmirCan";
-            PlayerSettings.productName = "Upstream";
+            // Launcher label. Store titles: "Blue'nun Nehri: Akıntıya Karşı" / "Blue's River: Swim & Grow".
+            PlayerSettings.productName = "Blue’s River"; // typographic apostrophe: a plain one needs escaping in Android strings.xml
             PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, "com.emircan.upstream");
             // Same settings for test APKs and store AABs, so what you test on the phone is what ships.
             PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);

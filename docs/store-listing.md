@@ -2,97 +2,100 @@
 
 Limitler: uygulama adı ≤ 30, kısa açıklama ≤ 80, tam açıklama ≤ 4000 karakter.
 
-## İsim önerileri
+## İsim
 
-"Akıntıya Karşı" Türkiye için güzel ama global aramada zayıf. Öneriler (mağazada çakışma kontrolü yap):
+Oyunun kahramanı **Blue** adında küçük mavi bir balık. Ekim 2026'da yapılan aramada Google Play'de
+"Blue's River" / "Blue'nun Nehri" adında bir oyun çıkmadı. "Swim Upstream" ve "Upstream" isimlerinden
+vazgeçildi, çünkü Play'de "Swimming Upstream" adında çok benzer bir nehir oyunu var (com.Unity.Upstream).
 
-| İsim | Neden |
-|---|---|
-| **Upstream: Fish Frenzy** | "upstream" + "fish" aranabilir, oyunun özünü anlatıyor |
-| **Koi Rush** | Kısa, akılda kalıcı, ikonla uyumlu |
-| **Swim Up: Eat or Be Eaten** | İmza mekaniği (köpekbalığını yemek) isimde |
-| **Big Fish River** | Büyüme fikrini anlatıyor, basit kelimeler |
+| | TR | EN |
+|---|---|---|
+| Mağaza başlığı (≤30) | `Blue'nun Nehri: Akıntıya Karşı` | `Blue's River: Swim & Grow` |
+| Telefondaki ad | Blue’s River | Blue’s River |
+| Menü başlığı | BLUE'NUN NEHRİ | BLUE'S RIVER |
 
-Aşağıdaki metinler "Upstream" için yazıldı; isim değişirse sadece başlığı değiştir.
+Paket adı `com.emircan.upstream` olarak kalıyor (oyuncular görmez; yayından sonra değiştirilemez).
 
 ---
 
 ## English (en-US)
 
-**App name (≤30):** `Upstream: Fish Frenzy`
+**App name (≤30):** `Blue's River: Swim & Grow`
 
 **Short description (≤80):**
-`Swim against the current, eat to grow, and turn the sharks into your snack!`
+`Help Blue swim against the current, eat to grow and turn the sharks into snacks!`
 
 **Full description:**
 
 ```
-The river is fast. The sharks are hungry. You are tiny… for now.
+The river is fast. The sharks are hungry. Blue is tiny… for now.
 
-Upstream is a one-finger arcade game about a little fish with big plans.
-Drag to steer, gobble shrimp, and grow — until the sharks that chased you
-become your next meal.
+Blue's River is a one-finger arcade game about a little blue fish with big
+plans. Drag to steer, gobble shrimp and grow — until the sharks that chased
+Blue become the next meal.
 
 ★ GROW FROM FRY TO TITAN
-Every shrimp makes you bigger. Five growth stages, each one changing how
-you play: bigger fish hit harder, but they also have less room to dodge.
+Every shrimp makes Blue bigger. Five growth stages, each one changing how
+you play: bigger fish hit harder, but have less room to dodge.
 
 ★ TURN THE TABLES
 Fill your power bar for a TURBO dash that smashes rocks and logs.
 Get big enough and the sharks stop being the hunters.
 
-★ WATCH OUT FOR HOOKS
-Not every snack is a snack. Fishing hooks look just like bait.
+★ PIRANHAS, PIKES, CATFISH… AND BIG WAVES
+New predators join the further you swim. Past 2000 m the river roars and
+giant waves roll in.
 
-★ ONE MORE RUN
-Short runs, instant restart, no tutorials needed. Beat your best distance
-and unlock a bigger starting fish.
+★ 30 FISH TO COLLECT
+Pick up coins and unlock 30 fish, each with its own ability: magnets,
+shields, rock breakers, wave riders and more.
 
 • One-finger controls
 • Plays offline
 • Optional ads: watch one to keep swimming — never forced mid-run
 
-How far upstream can you go?
+How far up the river can Blue go?
 ```
 
 ---
 
 ## Türkçe (tr-TR)
 
-**Uygulama adı (≤30):** `Akıntıya Karşı: Balık Avı`
+**Uygulama adı (≤30):** `Blue'nun Nehri: Akıntıya Karşı`
 
 **Kısa açıklama (≤80):**
-`Akıntıya karşı yüz, yedikçe büyü, köpekbalıklarını sen avla!`
+`Blue ile akıntıya karşı yüz, yedikçe büyü, köpekbalıklarını sen avla!`
 
 **Tam açıklama:**
 
 ```
-Nehir hızlı. Köpekbalıkları aç. Sen küçüksün… şimdilik.
+Nehir hızlı. Köpekbalıkları aç. Blue küçük… şimdilik.
 
-Akıntıya Karşı, büyük hayalleri olan küçük bir balığın tek parmakla
+Blue'nun Nehri, büyük hayalleri olan küçük mavi bir balığın tek parmakla
 oynanan arcade oyunu. Parmağını sürükle, karidesleri ye ve büyü —
-ta ki seni kovalayan köpekbalıkları senin yemeğin olana kadar.
+ta ki Blue'yu kovalayan köpekbalıkları onun yemeği olana kadar.
 
 ★ YAVRUDAN DEV TİTANA
-Her karides seni büyütür. Beş büyüme kademesi, her biri oyunu değiştirir:
+Her karides Blue'yu büyütür. Beş büyüme kademesi, her biri oyunu değiştirir:
 büyük balık daha güçlüdür ama kaçacak yeri de azalır.
 
 ★ AV AVCIYI
 Güç barını doldur, TURBO ile kayaları ve kütükleri parçala.
 Yeterince büyüdüğünde köpekbalıkları artık avcı değil.
 
-★ OLTALARA DİKKAT
-Her yem yem değildir. Oltalar uzaktan karides gibi görünür.
+★ PİRANA, TURNA, YAYIN BALIĞI… VE DEV DALGALAR
+Yüzdükçe yeni avcılar katılır. 2000 metreden sonra nehir coşar,
+dev dalgalar gelir.
 
-★ BİR TUR DAHA
-Kısa turlar, anında yeniden başla, öğretici yok. Rekorunu kır,
-daha büyük bir balıkla başlamanın kilidini aç.
+★ TOPLANACAK 30 BALIK
+Paraları topla, her birinin kendi yeteneği olan 30 balığın kilidini aç:
+mıknatıs, kalkan, kaya kıran, dalga sörfçüsü ve daha fazlası.
 
 • Tek parmakla kontrol
 • İnternetsiz oynanır
 • İsteğe bağlı reklam: devam etmek için izle — oyunun ortasında zorla reklam yok
 
-Akıntıya karşı ne kadar uzağa yüzebilirsin?
+Blue nehrin ne kadar yukarısına yüzebilir?
 ```
 
 ---
@@ -111,8 +114,8 @@ Her görüntünün üstüne kısa, büyük bir başlık koy (EN/TR ayrı setler)
 İpucu: Play Console bir **tanıtım videosu** (YouTube linki) da kabul ediyor. 15 saniyelik
 "yavru → kaç → büyü → köpekbalığını ye" videosu reklam materyalinle aynı olabilir.
 
-**Feature graphic (1024×500):** ikondaki koi + arkasında kocaman açık ağızlı köpekbalığı silüeti,
-sağda oyun adı.
+**Feature graphic (1024×500):** Blue + arkasında kocaman açık ağızlı köpekbalığı silüeti,
+sağda oyun adı (Blue's River / Blue'nun Nehri).
 
 ---
 

@@ -452,7 +452,7 @@ namespace Upstream.Core
 
             // Logo-style title
             TMP_Text titleText = CreateLabel("Title", menuObj.transform, new Vector2(0.5f, 0.80f), new Vector2(0.5f, 0.80f), Vector2.zero, new Vector2(300f, 140f), "", 58f, TextAlignmentOptions.Center, FontStyles.Bold);
-            // Each line ("SWIM" / "UPSTREAM") stays whole: shrink to fit instead of wrapping mid-word.
+            // Each line ("BLUE'S" / "RIVER") stays whole: shrink to fit instead of wrapping mid-word.
             titleText.textWrappingMode = TextWrappingModes.NoWrap;
             titleText.enableAutoSizing = true;
             titleText.fontSizeMin = 30f;

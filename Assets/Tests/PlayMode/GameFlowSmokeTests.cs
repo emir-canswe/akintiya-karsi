@@ -248,11 +248,11 @@ namespace Upstream.Tests
             // TR / EN picker switches the language live.
             FindButton("LangEN").onClick.Invoke();
             yield return null;
-            StringAssert.Contains("UPSTREAM", title.text);
+            StringAssert.Contains("RIVER", title.text);
 
             FindButton("LangTR").onClick.Invoke();
             yield return null;
-            StringAssert.Contains("KARŞI", title.text);
+            StringAssert.Contains("NEHRİ", title.text);
 
             FindButton("Close").onClick.Invoke();
             yield return null;
