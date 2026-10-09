@@ -20,11 +20,16 @@ namespace Upstream.UI
         [SerializeField] private TurboSystem turboSystem;
         private HealthSystem healthSystem;
         private TMP_Text runCoinsText;
+        private RectTransform coinPill;
+        private int shownCoins;
+        private float coinPopTime = 1f;
 
-        /// <summary>Optional coin counter (coins picked up this run).</summary>
-        public void SetCoinCounter(TMP_Text label)
+        /// <summary>Optional coin counter (coins picked up this run); <paramref name="pill"/> bounces on every pickup.</summary>
+        public void SetCoinCounter(TMP_Text label, RectTransform pill = null)
         {
             runCoinsText = label;
+            coinPill = pill;
+            shownCoins = 0;
             if (runCoinsText != null) runCoinsText.text = "0";
         }
 
@@ -87,10 +92,20 @@ namespace Upstream.UI
         private void HandleRunCoinsChanged(int coins)
         {
             if (runCoinsText != null) runCoinsText.text = coins.ToString();
+            if (coins > shownCoins) coinPopTime = 0f;
+            shownCoins = coins;
         }
 
         private void Update()
         {
+            if (coinPill != null && coinPopTime < 1f)
+            {
+                // Quick bounce: unscaled so it isn't stretched by the shark-eat slow motion.
+                coinPopTime = Mathf.Min(1f, coinPopTime + Time.unscaledDeltaTime * 5f);
+                float s = 1f + Mathf.Sin(coinPopTime * Mathf.PI) * 0.18f;
+                coinPill.localScale = new Vector3(s, s, 1f);
+            }
+
             if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Playing)
             {
                 if (turboSystem == null) turboSystem = FindFirstObjectByType<TurboSystem>();
@@ -166,6 +181,9 @@ namespace Upstream.UI
             if (powerBarFill != null) powerBarFill.fillAmount = 0f;
             if (distanceText != null) distanceText.text = "0<size=50%>m</size>";
             if (runCoinsText != null) runCoinsText.text = "0";
+            shownCoins = 0;
+            coinPopTime = 1f;
+            if (coinPill != null) coinPill.localScale = Vector3.one;
         }
 
         private void HandleGameOver()

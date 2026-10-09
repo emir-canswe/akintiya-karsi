@@ -390,14 +390,24 @@ namespace Upstream.Core
 
             hud.Configure(distText, heartImages, powerFillImg, powerBgObj, null, toastUI, turboSystem);
 
-            // Coins picked up this run (under the hearts)
-            GameObject hudCoinObj = CreateUIRect("CoinIcon", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(20f, -56f), new Vector2(17f, 17f));
+            // Coins picked up this run: a pill under the hearts, styled like the menu's coin balance
+            GameObject hudCoinPill = CreateUIRect("CoinPill", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(57f, -61f), new Vector2(94f, 32f));
+            Image hudCoinBg = hudCoinPill.AddComponent<Image>();
+            hudCoinBg.sprite = WatercolorSpriteFactory.GetRoundedRectSprite();
+            hudCoinBg.type = Image.Type.Sliced;
+            hudCoinBg.color = new Color(0.05f, 0.12f, 0.40f, 0.6f);
+            hudCoinBg.raycastTarget = false;
+            GameObject hudCoinObj = CreateUIRect("CoinIcon", hudCoinPill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(24f, 24f));
             Image hudCoinImg = hudCoinObj.AddComponent<Image>();
             hudCoinImg.sprite = WatercolorSpriteFactory.GetCoinSprite();
-            TMP_Text hudCoinText = CreateLabel("CoinText", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(82f, -56f), new Vector2(100f, 22f), "0", 16f, TextAlignmentOptions.Left, FontStyles.Bold);
+            hudCoinImg.raycastTarget = false;
+            TMP_Text hudCoinText = CreateLabel("CoinText", hudCoinPill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(60f, 0f), new Vector2(56f, 28f), "0", 19f, TextAlignmentOptions.Left, FontStyles.Bold);
             hudCoinText.color = new Color(1f, 0.86f, 0.3f, 1f);
+            hudCoinText.enableAutoSizing = true; // big runs (1000+) shrink to fit instead of spilling out
+            hudCoinText.fontSizeMin = 12f;
+            hudCoinText.fontSizeMax = 19f;
             SetOutline(hudCoinText, 0.3f);
-            hud.SetCoinCounter(hudCoinText);
+            hud.SetCoinCounter(hudCoinText, (RectTransform)hudCoinPill.transform);
             hudObj.SetActive(false);
 
             // --- MAIN MENU OVERLAY ---
