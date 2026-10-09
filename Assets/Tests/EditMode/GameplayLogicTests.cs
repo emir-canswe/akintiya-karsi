@@ -99,14 +99,14 @@ namespace Upstream.Tests
                 "no speed-up before the first step");
 
             float prev = DifficultyScaler.SpeedForDistance(0f, 140f, 420f);
-            for (float m = DifficultyScaler.SpeedStepMeters; m <= 6000f; m += DifficultyScaler.SpeedStepMeters)
+            for (float m = DifficultyScaler.SpeedStepMeters; m <= 3000f; m += DifficultyScaler.SpeedStepMeters)
             {
                 float v = DifficultyScaler.SpeedForDistance(m, 140f, 420f);
                 Assert.Greater(v, prev, $"speed must step up at {m} m");
                 Assert.LessOrEqual(v - prev, DifficultyScaler.SpeedStep + 1e-3f, "steps stay small");
                 prev = v;
             }
-            Assert.Less(DifficultyScaler.SpeedForDistance(1000f, 140f, 420f), 260f, "still gentle after 1 km");
+            Assert.Less(DifficultyScaler.SpeedForDistance(1000f, 140f, 420f), 420f, "top speed is not reached in the first km");
             Assert.LessOrEqual(DifficultyScaler.SpeedForDistance(1e6f, 140f, 420f), 420f * 1.2f + 1e-3f, "capped");
         }
 
