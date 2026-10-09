@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -21,11 +22,16 @@ namespace Upstream.Core
         public int bestStageReached;
         /// <summary>Set by the future "Remove Ads" purchase; disables interstitials (rewarded stays opt-in).</summary>
         public bool adsRemoved;
+        // v3
+        public int coins;
+        /// <summary>IDs from FishCatalog the player owns. The starter fish (0) is always owned.</summary>
+        public List<int> ownedFish = new List<int> { 0 };
+        public int equippedFish;
     }
 
     public static class SaveSystem
     {
-        private const int CurrentVersion = 2;
+        private const int CurrentVersion = 3;
         private static string SavePath => Application.persistentDataPath + "/save.json";
         private static object fileLock = new object();
 
@@ -108,6 +114,10 @@ namespace Upstream.Core
             {
                 data.bestStageReached = Mathf.Max(data.bestStageReached, data.unlockedStartStage);
             }
+            // v2 -> v3: coins/fish shop. Every player owns and wears the starter fish.
+            if (data.ownedFish == null) data.ownedFish = new List<int>();
+            if (!data.ownedFish.Contains(0)) data.ownedFish.Add(0);
+            if (!data.ownedFish.Contains(data.equippedFish)) data.equippedFish = 0;
             data.version = CurrentVersion;
         }
     }

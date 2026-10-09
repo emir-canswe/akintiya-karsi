@@ -1,0 +1,116 @@
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using Upstream.Core;
+using Upstream.Data;
+
+namespace Upstream.Tests
+{
+    public class ShopTests
+    {
+        // --- Catalog ---
+
+        [Test]
+        public void Catalog_Has20Fish_WithStableUniqueIds()
+        {
+            Assert.AreEqual(20, FishCatalog.Count);
+            CollectionAssert.AreEqual(Enumerable.Range(0, 20).ToList(), FishCatalog.All.Select(f => f.id).ToList());
+        }
+
+        [Test]
+        public void Catalog_GoesFromFreeStarterToBest()
+        {
+            var all = FishCatalog.All;
+            Assert.AreEqual(0, all[0].price, "Starter fish is free.");
+            Assert.AreEqual(FishCatalog.StarterId, all[0].id);
+            for (int i = 1; i < all.Count; i++)
+            {
+                Assert.Greater(all[i].price, all[i - 1].price, $"Fish {i} must cost more than fish {i - 1}.");
+                Assert.GreaterOrEqual((int)all[i].rarity, (int)all[i - 1].rarity, $"Rarity order at {i}.");
+                Assert.GreaterOrEqual(all[i].coinBonus, all[i - 1].coinBonus, $"Coin bonus order at {i}.");
+            }
+            Assert.IsTrue(all[all.Count - 1].extraHeart, "The best fish gives the extra heart.");
+        }
+
+        [Test]
+        public void Catalog_EveryFishHasNamesInBothLanguages()
+        {
+            foreach (var fish in FishCatalog.All)
+            {
+                Assert.IsFalse(string.IsNullOrWhiteSpace(fish.nameTr), $"fish {fish.id} TR");
+                Assert.IsFalse(string.IsNullOrWhiteSpace(fish.nameEn), $"fish {fish.id} EN");
+            }
+        }
+
+        [Test]
+        public void Catalog_UnknownId_FallsBackToStarter()
+        {
+            Assert.AreEqual(FishCatalog.StarterId, FishCatalog.Get(999).id);
+        }
+
+        // --- Buying / equipping ---
+
+        [Test]
+        public void TryBuy_NotEnoughCoins_ChangesNothing()
+        {
+            var save = new SaveData { coins = 10 };
+            var fish = FishCatalog.Get(1);
+            Assert.AreEqual(BuyResult.NotEnoughCoins, FishShop.TryBuy(save, fish));
+            Assert.AreEqual(10, save.coins);
+            Assert.IsFalse(FishShop.Owns(save, fish.id));
+        }
+
+        [Test]
+        public void TryBuy_PaysAndOwns_OnlyOnce()
+        {
+            var fish = FishCatalog.Get(2);
+            var save = new SaveData { coins = fish.price + 5 };
+            Assert.AreEqual(BuyResult.Bought, FishShop.TryBuy(save, fish));
+            Assert.AreEqual(5, save.coins);
+            Assert.IsTrue(FishShop.Owns(save, fish.id));
+            Assert.AreEqual(BuyResult.AlreadyOwned, FishShop.TryBuy(save, fish));
+            Assert.AreEqual(5, save.coins, "Owned fish are never charged twice.");
+        }
+
+        [Test]
+        public void TryEquip_OnlyOwnedFish()
+        {
+            var save = new SaveData();
+            Assert.IsFalse(FishShop.TryEquip(save, 5));
+            Assert.AreEqual(0, save.equippedFish);
+            save.ownedFish.Add(5);
+            Assert.IsTrue(FishShop.TryEquip(save, 5));
+            Assert.AreEqual(5, save.equippedFish);
+        }
+
+        [Test]
+        public void StarterFish_IsAlwaysOwned()
+        {
+            var save = new SaveData { ownedFish = new List<int>() };
+            Assert.IsTrue(FishShop.Owns(save, FishCatalog.StarterId));
+        }
+
+        // --- Rewards ---
+
+        [Test]
+        public void RunReward_PickupsPlusDistance_WithFishBonus()
+        {
+            Assert.AreEqual(0, FishShop.RunReward(0, 0, 0f));
+            Assert.AreEqual(12, FishShop.RunReward(10, 2 * FishShop.MetersPerCoin + 3, 0f));
+            Assert.AreEqual(18, FishShop.RunReward(10, 2 * FishShop.MetersPerCoin, 0.5f));
+            Assert.AreEqual(0, FishShop.RunReward(-5, -100, 0.5f), "Never negative.");
+        }
+
+        // --- Save migration ---
+
+        [Test]
+        public void Migrate_V2Save_OwnsAndWearsStarter()
+        {
+            var v2 = new SaveData { version = 2, ownedFish = null, equippedFish = 7, bestScore = 300 };
+            SaveSystem.Migrate(v2);
+            CollectionAssert.Contains(v2.ownedFish, FishCatalog.StarterId);
+            Assert.AreEqual(FishCatalog.StarterId, v2.equippedFish, "Can't wear a fish you don't own.");
+            Assert.AreEqual(300, v2.bestScore);
+        }
+    }
+}

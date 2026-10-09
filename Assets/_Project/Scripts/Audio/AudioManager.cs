@@ -122,6 +122,7 @@ namespace Upstream.Audio
             GameEvents.OnPlayerDied += HandlePlayerDied;
             GameEvents.OnSharkEaten += HandleSharkEaten;
             GameEvents.OnGrowthStageChanged += HandleGrowthStageChanged;
+            GameEvents.OnCoinCollected += HandleCoinCollected;
         }
 
         private void OnDisable()
@@ -133,6 +134,7 @@ namespace Upstream.Audio
             GameEvents.OnPlayerDied -= HandlePlayerDied;
             GameEvents.OnSharkEaten -= HandleSharkEaten;
             GameEvents.OnGrowthStageChanged -= HandleGrowthStageChanged;
+            GameEvents.OnCoinCollected -= HandleCoinCollected;
         }
 
         public void PlaySFX(AudioClip clip, float pitch = 1f)
@@ -211,6 +213,9 @@ namespace Upstream.Audio
             }
 #endif
         }
+
+        // Bright "ding": the gold-food chime pitched up, slightly varied so a coin trail sounds lively.
+        private void HandleCoinCollected(int amount) => PlaySFXPitchVaried(eatGoldFood, 1.75f, 1.95f);
 
         private void HandleFoodEaten(bool isGold)
         {

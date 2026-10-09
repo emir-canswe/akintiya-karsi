@@ -25,6 +25,8 @@ namespace Upstream.UI
         [SerializeField] private CanvasGroup canvasGroup;
         [SerializeField] private ScoreSystem scoreSystem;
 
+        private TMP_Text coinsEarnedText;
+        private Button menuButton;
         private IAdsService adsService;
         private bool hasContinued;
         private bool waitingForAd;
@@ -54,6 +56,14 @@ namespace Upstream.UI
             BindButtons();
         }
 
+        /// <summary>Coins line ("+42 coins") and the button back to the main menu (shop lives there).</summary>
+        public void SetCoinsAndMenu(TMP_Text coinsText, Button menuBtn)
+        {
+            coinsEarnedText = coinsText;
+            menuButton = menuBtn;
+            BindButtons();
+        }
+
         // Subscribed in Awake/OnDestroy (not OnEnable/OnDisable): this screen starts hidden, and an
         // inactive object with OnEnable-based subscriptions would never receive OnGameOver,
         // leaving the player stuck on an empty screen after dying.
@@ -65,6 +75,7 @@ namespace Upstream.UI
             GameEvents.OnGameOver += HandleGameOver;
             GameEvents.OnGameStart += HandleGameStart;
             GameEvents.OnContinueUsed += HandleContinueUsed;
+            GameEvents.OnReturnToMenu += HandleReturnToMenu;
             LocalizationManager.OnLanguageChanged += RefreshTexts;
         }
 
@@ -73,6 +84,7 @@ namespace Upstream.UI
             GameEvents.OnGameOver -= HandleGameOver;
             GameEvents.OnGameStart -= HandleGameStart;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
+            GameEvents.OnReturnToMenu -= HandleReturnToMenu;
             LocalizationManager.OnLanguageChanged -= RefreshTexts;
         }
 
@@ -87,6 +99,11 @@ namespace Upstream.UI
             {
                 continueButton.onClick.RemoveListener(OnContinueClicked);
                 continueButton.onClick.AddListener(OnContinueClicked);
+            }
+            if (menuButton != null)
+            {
+                menuButton.onClick.RemoveListener(OnMenuClicked);
+                menuButton.onClick.AddListener(OnMenuClicked);
             }
         }
 
@@ -128,6 +145,7 @@ namespace Upstream.UI
             if (scoreText != null) scoreText.text = $"{currentScore}<size=45%>m</size>";
             if (newBestBadge != null) newBestBadge.SetActive(isNewBest);
             if (bestScoreText != null) bestScoreText.text = LocalizationManager.Format("best_score", best);
+            if (coinsEarnedText != null) coinsEarnedText.text = LocalizationManager.Format("coins_earned", gm != null ? gm.LastRunCoins : 0);
 
             if (unlockNoteText != null)
             {
@@ -179,6 +197,12 @@ namespace Upstream.UI
             }
         }
 
+        private void OnMenuClicked()
+        {
+            if (waitingForAd || GameManager.Instance == null) return;
+            GameManager.Instance.ReturnToMenu();
+        }
+
         private void OnContinueClicked()
         {
             if (waitingForAd || hasContinued) return;
@@ -221,9 +245,17 @@ namespace Upstream.UI
         {
             if (playAgainButton != null) playAgainButton.interactable = interactable;
             if (continueButton != null) continueButton.interactable = interactable;
+            if (menuButton != null) menuButton.interactable = interactable;
         }
 
         private void HandleGameStart()
+        {
+            hasContinued = false;
+            waitingForAd = false;
+            gameObject.SetActive(false);
+        }
+
+        private void HandleReturnToMenu()
         {
             hasContinued = false;
             waitingForAd = false;

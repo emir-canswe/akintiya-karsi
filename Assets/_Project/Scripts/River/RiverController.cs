@@ -61,6 +61,7 @@ namespace Upstream.River
         private void OnEnable()
         {
             GameEvents.OnGameStart += ResetRiver;
+            GameEvents.OnReturnToMenu += ResetRiver;
             GameEvents.OnTurboStart += OnTurboStart;
             GameEvents.OnTurboEnd += OnTurboEnd;
         }
@@ -68,6 +69,7 @@ namespace Upstream.River
         private void OnDisable()
         {
             GameEvents.OnGameStart -= ResetRiver;
+            GameEvents.OnReturnToMenu -= ResetRiver;
             GameEvents.OnTurboStart -= OnTurboStart;
             GameEvents.OnTurboEnd -= OnTurboEnd;
         }

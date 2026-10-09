@@ -37,5 +37,11 @@ namespace Upstream.Core
         public static Action<bool> OnFoodEaten;
         public static Action OnSharkEaten;
         public static Action OnContinueUsed;
+        /// <summary>A coin pickup was collected (arg: coins).</summary>
+        public static Action<int> OnCoinCollected;
+        /// <summary>Coins picked up in the current run changed (arg: run total, before the end-of-run bonus).</summary>
+        public static Action<int> OnRunCoinsChanged;
+        /// <summary>The player left the game over screen for the main menu.</summary>
+        public static Action OnReturnToMenu;
     }
 }

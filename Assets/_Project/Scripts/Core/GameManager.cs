@@ -32,12 +32,17 @@ namespace Upstream.Core
         public int BestScore { get; private set; }
         /// <summary>Stage index a new run now starts at, if the run that just ended unlocked it; otherwise -1.</summary>
         public int LastRunUnlockedStartStage { get; private set; } = -1;
+        /// <summary>Coins the run that just ended paid into the wallet (pickups + distance, with the fish bonus).</summary>
+        public int LastRunCoins { get; private set; }
 
         /// <summary>Needed for the start-stage unlock rule; assigned by the bootstrap.</summary>
         public GrowthConfig GrowthConfig { get; set; }
 
         private int sharksEatenThisRun;
         private int maxStageThisRun;
+        private int coinsPickedThisRun;
+        // Meters already paid out as coins; after a continue only the new distance pays again.
+        private int metersPaid;
 
         private void Awake()
         {
@@ -58,21 +63,36 @@ namespace Upstream.Core
         {
             GameEvents.OnSharkEaten += HandleSharkEaten;
             GameEvents.OnGrowthStageChanged += HandleStageChanged;
+            GameEvents.OnCoinCollected += HandleCoinCollected;
         }
 
         private void OnDisable()
         {
             GameEvents.OnSharkEaten -= HandleSharkEaten;
             GameEvents.OnGrowthStageChanged -= HandleStageChanged;
+            GameEvents.OnCoinCollected -= HandleCoinCollected;
         }
 
-        private void HandleSharkEaten() => sharksEatenThisRun++;
+        private void HandleSharkEaten()
+        {
+            sharksEatenThisRun++;
+            HandleCoinCollected(FishShop.SharkCoins);
+        }
+
+        private void HandleCoinCollected(int amount)
+        {
+            if (CurrentState != GameState.Playing) return;
+            coinsPickedThisRun += amount;
+            GameEvents.OnRunCoinsChanged?.Invoke(coinsPickedThisRun);
+        }
+
         private void HandleStageChanged(int stage) => maxStageThisRun = Mathf.Max(maxStageThisRun, stage);
 
         private void Update()
         {
             // Android back button arrives as Escape in the Input System.
             if (Keyboard.current == null || !Keyboard.current.escapeKey.wasPressedThisFrame) return;
+            if (UIBackStack.TryPop()) return; // close the open shop/settings panel first
 
             switch (CurrentState)
             {
@@ -105,6 +125,9 @@ namespace Upstream.Core
             sharksEatenThisRun = 0;
             maxStageThisRun = 0; // GrowthSystem re-raises the start stage on OnGameStart
             LastRunUnlockedStartStage = -1;
+            coinsPickedThisRun = 0;
+            metersPaid = 0;
+            LastRunCoins = 0;
             CurrentState = GameState.Playing;
             Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
@@ -185,9 +208,30 @@ namespace Upstream.Core
                 save.unlockedStartStage = newStart;
                 if (newStart > oldStart) LastRunUnlockedStartStage = newStart;
             }
+
+            // Coins: pickups + distance not yet paid, boosted by the equipped fish.
+            float bonus = FishCatalog.Get(save.equippedFish).coinBonus;
+            LastRunCoins = FishShop.RunReward(coinsPickedThisRun, score - metersPaid, bonus);
+            FishShop.Deposit(save, LastRunCoins);
+            coinsPickedThisRun = 0;
+            metersPaid = score;
             SaveSystem.Save(save);
+            FishShop.RaiseBalanceChanged(save.coins);
 
             GameEvents.OnGameOver?.Invoke();
+        }
+
+        /// <summary>Leaves the game over screen for the main menu (to visit the shop, settings...).</summary>
+        public void ReturnToMenu()
+        {
+            if (CurrentState != GameState.GameOver) return;
+
+            StopAllCoroutines();
+            Time.timeScale = 1f;
+            AudioListener.pause = false;
+            CurrentState = GameState.Menu;
+            CurrentDistance = 0f;
+            GameEvents.OnReturnToMenu?.Invoke();
         }
 
         /// <summary>

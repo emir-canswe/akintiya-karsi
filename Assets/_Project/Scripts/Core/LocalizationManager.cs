@@ -31,7 +31,7 @@ namespace Upstream.Core
             // Menu
             { "title", new Entry("AKINTIYA\n<color=#FF8A5C>KARŞI</color>", "SWIM\n<color=#FF8A5C>UPSTREAM</color>") },
             { "how_to", new Entry("Parmağını sürükle, balığı yönlendir.\nYemleri ye, büyü ve köpekbalıklarını yut!", "Drag to steer your fish.\nEat shrimp, grow bigger and devour sharks!") },
-            { "tap_to_start", new Entry("Başlamak için dokun", "Tap to start") },
+            { "play_btn", new Entry("OYNA", "PLAY") },
             { "best_score", new Entry("En iyi: {0} m", "Best: {0} m") },
             { "start_stage_unlocked", new Entry("Artık <b>{0}</b> olarak başlıyorsun", "You now start as <b>{0}</b>") },
 
@@ -71,12 +71,30 @@ namespace Upstream.Core
 
             // Settings
             { "settings_title", new Entry("AYARLAR", "SETTINGS") },
-            { "sound_on", new Entry("Ses: AÇIK", "Sound: ON") },
-            { "sound_off", new Entry("Ses: KAPALI", "Sound: OFF") },
-            { "vib_on", new Entry("Titreşim: AÇIK", "Vibration: ON") },
-            { "vib_off", new Entry("Titreşim: KAPALI", "Vibration: OFF") },
-            { "lang_btn", new Entry("Dil: Türkçe", "Language: English") },
+            { "sound_label", new Entry("Ses", "Sound") },
+            { "vib_label", new Entry("Titreşim", "Vibration") },
+            { "lang_label", new Entry("Dil", "Language") },
             { "close_btn", new Entry("Kapat", "Close") },
+
+            // Coins & fish shop
+            { "shop_btn", new Entry("BALIKLAR", "FISH") },
+            { "shop_title", new Entry("BALIK DÜKKANI", "FISH SHOP") },
+            { "buy_for", new Entry("SATIN AL • {0}", "BUY • {0}") },
+            { "need_more", new Entry("{0} para eksik", "Need {0} more") },
+            { "equip_btn", new Entry("SEÇ", "SELECT") },
+            { "equipped", new Entry("KULLANILIYOR", "EQUIPPED") },
+            { "equipped_short", new Entry("SEÇİLİ", "IN USE") },
+            { "owned", new Entry("SENDE", "OWNED") },
+            { "rarity_0", new Entry("Sıradan", "Common") },
+            { "rarity_1", new Entry("Seçkin", "Uncommon") },
+            { "rarity_2", new Entry("Nadir", "Rare") },
+            { "rarity_3", new Entry("Destansı", "Epic") },
+            { "rarity_4", new Entry("Efsanevi", "Legendary") },
+            { "perk_coin", new Entry("+%{0} para", "+{0}% coins") },
+            { "perk_heart", new Entry("+1 can", "+1 heart") },
+            { "perk_none", new Entry("Başlangıç balığı", "Starter fish") },
+            { "coins_earned", new Entry("+{0} para", "+{0} coins") },
+            { "menu_btn", new Entry("Ana Menü", "Main Menu") },
         };
 
         public static IEnumerable<string> Keys => Table.Keys;

@@ -18,6 +18,15 @@ namespace Upstream.UI
         [SerializeField] private GameObject turboGlowEffect;
         [SerializeField] private ToastUI toastUI;
         [SerializeField] private TurboSystem turboSystem;
+        private HealthSystem healthSystem;
+        private TMP_Text runCoinsText;
+
+        /// <summary>Optional coin counter (coins picked up this run).</summary>
+        public void SetCoinCounter(TMP_Text label)
+        {
+            runCoinsText = label;
+            if (runCoinsText != null) runCoinsText.text = "0";
+        }
 
         public void Configure(
             TMP_Text distText,
@@ -56,6 +65,7 @@ namespace Upstream.UI
             GameEvents.OnGameStart += HandleGameStart;
             GameEvents.OnGameOver += HandleGameOver;
             GameEvents.OnContinueUsed += HandleContinueUsed;
+            GameEvents.OnRunCoinsChanged += HandleRunCoinsChanged;
         }
 
         private void OnDestroy()
@@ -69,6 +79,12 @@ namespace Upstream.UI
             GameEvents.OnGameStart -= HandleGameStart;
             GameEvents.OnGameOver -= HandleGameOver;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
+            GameEvents.OnRunCoinsChanged -= HandleRunCoinsChanged;
+        }
+
+        private void HandleRunCoinsChanged(int coins)
+        {
+            if (runCoinsText != null) runCoinsText.text = coins.ToString();
         }
 
         private void Update()
@@ -99,10 +115,14 @@ namespace Upstream.UI
         public void UpdateHearts(int hp)
         {
             if (heartIcons == null) return;
+            if (healthSystem == null) healthSystem = FindFirstObjectByType<HealthSystem>();
+            int maxHp = healthSystem != null ? healthSystem.MaxHP : 3;
             for (int i = 0; i < heartIcons.Length; i++)
             {
                 if (heartIcons[i] != null)
                 {
+                    // Extra heart slots (legendary fish) only show when that fish is worn.
+                    heartIcons[i].gameObject.SetActive(i < maxHp);
                     heartIcons[i].color = i < hp
                         ? new Color(1f, 0.36f, 0.42f, 1f)
                         : new Color(0f, 0.12f, 0.18f, 0.45f);
@@ -143,6 +163,7 @@ namespace Upstream.UI
             // Hearts are refreshed by HealthSystem.ResetHealth -> OnHealthChanged.
             if (powerBarFill != null) powerBarFill.fillAmount = 0f;
             if (distanceText != null) distanceText.text = "0<size=50%>m</size>";
+            if (runCoinsText != null) runCoinsText.text = "0";
         }
 
         private void HandleGameOver()

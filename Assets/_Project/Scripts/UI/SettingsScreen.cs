@@ -7,62 +7,82 @@ using Upstream.Core;
 namespace Upstream.UI
 {
     /// <summary>
-    /// Settings panel: sound, vibration, language. Opened from the menu and the pause overlay.
+    /// Settings panel: sound and vibration switches, TR/EN language picker. Opened from the menu and the pause overlay.
     /// Every change is saved immediately (AudioManager / LocalizationManager persist it).
     /// </summary>
     public class SettingsScreen : MonoBehaviour
     {
-        private Button soundButton;
-        private Button vibrationButton;
-        private Button languageButton;
-        private Button closeButton;
-        private TMP_Text soundLabel;
-        private TMP_Text vibrationLabel;
-        private TMP_Text languageLabel;
+        private static readonly Color LangSelectedBg = new Color(1f, 0.54f, 0.36f, 1f);
+        private static readonly Color LangSelectedText = new Color(0.17f, 0.05f, 0f, 1f);
+        private static readonly Color LangIdleBg = new Color(1f, 1f, 1f, 0f);
+        private static readonly Color LangIdleText = new Color(1f, 1f, 1f, 0.7f);
+        private const float PopDuration = 0.18f;
 
-        public void Configure(Button sound, TMP_Text soundLbl, Button vibration, TMP_Text vibrationLbl,
-                              Button language, TMP_Text languageLbl, Button close)
+        private ToggleSwitch soundSwitch;
+        private ToggleSwitch vibrationSwitch;
+        private Button turkishButton;
+        private Button englishButton;
+        private RectTransform card;
+        private float popTime = PopDuration;
+
+        public void Configure(Button soundRow, ToggleSwitch soundSw, Button vibrationRow, ToggleSwitch vibrationSw,
+                              Button turkish, Button english, Button close, RectTransform cardRect)
         {
-            soundButton = sound;
-            soundLabel = soundLbl;
-            vibrationButton = vibration;
-            vibrationLabel = vibrationLbl;
-            languageButton = language;
-            languageLabel = languageLbl;
-            closeButton = close;
+            soundSwitch = soundSw;
+            vibrationSwitch = vibrationSw;
+            turkishButton = turkish;
+            englishButton = english;
+            card = cardRect;
 
-            soundButton.onClick.AddListener(ToggleSound);
-            vibrationButton.onClick.AddListener(ToggleVibration);
-            languageButton.onClick.AddListener(LocalizationManager.ToggleLanguage);
-            closeButton.onClick.AddListener(Close);
-            Refresh();
+            // The whole row is the tap target, not just the small switch.
+            soundRow.onClick.AddListener(ToggleSound);
+            vibrationRow.onClick.AddListener(ToggleVibration);
+            turkishButton.onClick.AddListener(() => LocalizationManager.SetLanguage(LocalizationManager.Turkish));
+            englishButton.onClick.AddListener(() => LocalizationManager.SetLanguage(LocalizationManager.English));
+            close.onClick.AddListener(Close);
+            Refresh(false);
         }
 
         private void Awake()
         {
-            AudioManager.OnSettingsChanged += Refresh;
-            LocalizationManager.OnLanguageChanged += Refresh;
+            AudioManager.OnSettingsChanged += RefreshAnimated;
+            LocalizationManager.OnLanguageChanged += RefreshAnimated;
             GameEvents.OnGameStart += Close;
             GameEvents.OnGameResume += Close;
         }
 
         private void OnDestroy()
         {
-            AudioManager.OnSettingsChanged -= Refresh;
-            LocalizationManager.OnLanguageChanged -= Refresh;
+            AudioManager.OnSettingsChanged -= RefreshAnimated;
+            LocalizationManager.OnLanguageChanged -= RefreshAnimated;
             GameEvents.OnGameStart -= Close;
             GameEvents.OnGameResume -= Close;
+            UIBackStack.Remove(Close);
         }
 
         public void Open()
         {
-            Refresh();
             gameObject.SetActive(true);
+            UIBackStack.Push(Close);
+            Refresh(false);
+            popTime = 0f;
+            Update();
         }
 
         public void Close()
         {
+            UIBackStack.Remove(Close);
             gameObject.SetActive(false);
+        }
+
+        private void Update()
+        {
+            if (card == null || popTime >= PopDuration) return;
+            // Small "pop" when the card appears; unscaled so it also plays while paused.
+            popTime = Mathf.Min(popTime + Time.unscaledDeltaTime, PopDuration);
+            float k = popTime / PopDuration;
+            float scale = Mathf.LerpUnclamped(0.88f, 1f, 1f - (1f - k) * (1f - k));
+            card.localScale = new Vector3(scale, scale, 1f);
         }
 
         private static void ToggleSound()
@@ -78,15 +98,26 @@ namespace Upstream.UI
             if (audio.IsVibrationOn) audio.Vibrate(40); // feedback: you feel that it's on
         }
 
-        private void Refresh()
+        private void RefreshAnimated() => Refresh(true);
+
+        private void Refresh(bool animate)
         {
             var audio = AudioManager.Instance;
-            bool soundOn = audio == null || !audio.IsMuted;
-            bool vibrationOn = audio == null || audio.IsVibrationOn;
+            if (soundSwitch != null) soundSwitch.SetOn(audio == null || !audio.IsMuted, animate);
+            if (vibrationSwitch != null) vibrationSwitch.SetOn(audio == null || audio.IsVibrationOn, animate);
 
-            if (soundLabel != null) soundLabel.text = LocalizationManager.Get(soundOn ? "sound_on" : "sound_off");
-            if (vibrationLabel != null) vibrationLabel.text = LocalizationManager.Get(vibrationOn ? "vib_on" : "vib_off");
-            if (languageLabel != null) languageLabel.text = LocalizationManager.Get("lang_btn");
+            bool turkish = LocalizationManager.CurrentLanguage == LocalizationManager.Turkish;
+            StyleLanguageButton(turkishButton, turkish);
+            StyleLanguageButton(englishButton, !turkish);
+        }
+
+        private static void StyleLanguageButton(Button button, bool selected)
+        {
+            if (button == null) return;
+            var bg = button.GetComponent<Image>();
+            if (bg != null) bg.color = selected ? LangSelectedBg : LangIdleBg;
+            var label = button.GetComponentInChildren<TMP_Text>();
+            if (label != null) label.color = selected ? LangSelectedText : LangIdleText;
         }
     }
 }

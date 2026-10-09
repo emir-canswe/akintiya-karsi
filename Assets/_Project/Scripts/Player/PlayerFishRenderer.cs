@@ -1,5 +1,6 @@
 using UnityEngine;
 using Upstream.Core;
+using Upstream.Data;
 using Upstream.Mechanics;
 using Upstream.River;
 
@@ -26,6 +27,7 @@ namespace Upstream.Player
         private float wagClock;
         private float currentVisualScale = 1f;
         private float stagePopScale;
+        private FishDef skin;
 
         private void Awake()
         {
@@ -35,18 +37,39 @@ namespace Upstream.Player
             growthSystem = GetComponent<GrowthSystem>();
 
             BuildFishHierarchy();
+            ApplySkin(FishShop.Equipped);
         }
 
         private void OnEnable()
         {
             GameEvents.OnGrowthStageChanged += HandleStageChanged;
             GameEvents.OnSharkEaten += HandleSharkEaten;
+            FishShop.OnFishEquipped += ApplySkin;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGrowthStageChanged -= HandleStageChanged;
             GameEvents.OnSharkEaten -= HandleSharkEaten;
+            FishShop.OnFishEquipped -= ApplySkin;
+        }
+
+        /// <summary>Swaps in the bought fish's sprites and proportions (also live, from the shop behind the menu).</summary>
+        public void ApplySkin(FishDef fish)
+        {
+            if (fish == null || bodyRenderer == null) return;
+            skin = fish;
+
+            bodyRenderer.sprite = FishSkinFactory.GetBody(fish);
+            tailRenderer.sprite = FishSkinFactory.GetTail(fish);
+            leftFinRenderer.sprite = FishSkinFactory.GetFin(fish);
+            rightFinRenderer.sprite = FishSkinFactory.GetFin(fish);
+
+            bodyRenderer.transform.localScale = new Vector3(fish.width, fish.length, 1f);
+            tailRenderer.transform.localPosition = new Vector3(0f, -18f * fish.length, 0f);
+            tailRenderer.transform.localScale = Vector3.one * fish.tailSize;
+            leftFinRenderer.transform.localPosition = new Vector3(-13f * fish.width, 2f, 0f);
+            rightFinRenderer.transform.localPosition = new Vector3(13f * fish.width, 2f, 0f);
         }
 
         private void HandleStageChanged(int stage)
@@ -164,6 +187,19 @@ namespace Upstream.Player
                 // Subtle golden aura showing shark-eating power
                 float pulse = 0.18f + 0.10f * Mathf.Sin(Time.time * 6f);
                 auraRenderer.color = new Color(1f, 0.84f, 0.35f, pulse);
+            }
+            else if (skin != null && skin.pattern == FishPattern.Rainbow)
+            {
+                // Rainbow Legend: aura cycles through every hue.
+                Color hue = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.25f, 1f), 0.55f, 1f);
+                hue.a = skin.glow.a * (0.8f + 0.2f * Mathf.Sin(Time.time * 5f));
+                auraRenderer.color = hue;
+            }
+            else if (skin != null && skin.glow.a > 0f)
+            {
+                Color glow = skin.glow;
+                glow.a *= 0.8f + 0.2f * Mathf.Sin(Time.time * 4f);
+                auraRenderer.color = glow;
             }
             else
             {

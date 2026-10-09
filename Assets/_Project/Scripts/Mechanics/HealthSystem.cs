@@ -17,6 +17,8 @@ namespace Upstream.Mechanics
         private int currentHP = 3;
         private float invincibilityTimer;
         private TurboSystem turboSystem;
+        // +1 heart from a legendary fish; refreshed at the start of every run.
+        private int bonusHearts;
 
         public GameConfig Config
         {
@@ -35,7 +37,7 @@ namespace Upstream.Mechanics
 
         public int CurrentHP => currentHP;
         public bool IsInvincible => invincibilityTimer > 0f;
-        public int MaxHP => Config.maxHP;
+        public int MaxHP => Config.maxHP + bonusHearts;
 
         // Resolved lazily: the bootstrap adds TurboSystem after HealthSystem, so it doesn't exist yet in Awake.
         private TurboSystem Turbo
@@ -49,7 +51,7 @@ namespace Upstream.Mechanics
 
         private void Awake()
         {
-            currentHP = Config.maxHP;
+            currentHP = MaxHP;
         }
 
         private void OnEnable()
@@ -97,14 +99,15 @@ namespace Upstream.Mechanics
 
         private void HandleContinueUsed()
         {
-            currentHP = Mathf.Clamp(Config.continueHP, 1, Config.maxHP);
+            currentHP = Mathf.Clamp(Config.continueHP, 1, MaxHP);
             SetInvincible(Config.continueInvincibility);
             GameEvents.OnHealthChanged?.Invoke(currentHP);
         }
 
         public void ResetHealth()
         {
-            currentHP = Config.maxHP;
+            bonusHearts = FishShop.Equipped.extraHeart ? 1 : 0;
+            currentHP = MaxHP;
             invincibilityTimer = 0f;
             GameEvents.OnHealthChanged?.Invoke(currentHP);
         }
@@ -140,8 +143,8 @@ namespace Upstream.Mechanics
         /// <summary>Returns true if any HP was actually restored.</summary>
         public bool Heal(int amount)
         {
-            if (amount <= 0 || currentHP <= 0 || currentHP >= Config.maxHP) return false;
-            currentHP = Mathf.Min(currentHP + amount, Config.maxHP);
+            if (amount <= 0 || currentHP <= 0 || currentHP >= MaxHP) return false;
+            currentHP = Mathf.Min(currentHP + amount, MaxHP);
             GameEvents.OnHealthChanged?.Invoke(currentHP);
             return true;
         }

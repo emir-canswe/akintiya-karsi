@@ -13,24 +13,54 @@ namespace Upstream.UI
     {
         [SerializeField] private TMP_Text titleText;
         [SerializeField] private TMP_Text instructionText;
-        [SerializeField] private TMP_Text tapToStartText;
+        [SerializeField] private Button playButton;
         [SerializeField] private TMP_Text bestScoreText;
+        [SerializeField] private GameObject backdrop;
+        private TMP_Text coinBalanceText;
 
-        public void Configure(TMP_Text title, TMP_Text how, TMP_Text tap, TMP_Text best)
+        /// <summary>Coin balance shown on the menu (top-left).</summary>
+        public void SetCoinBalance(TMP_Text label)
         {
-            titleText = title;
-            instructionText = how;
-            tapToStartText = tap;
-            bestScoreText = best;
-            UpdateBestScore();
+            coinBalanceText = label;
+            UpdateCoins(FishShop.Balance);
         }
 
+        // Awake/OnDestroy: the menu is inactive during a run and must still hear "back to menu".
         private void Awake()
         {
-            // "Tap anywhere" is a full-screen UI Button on this object, so taps on other UI
-            // (e.g. the sound toggle drawn above it) are consumed by that UI and don't start a run.
-            var tapArea = GetComponent<Button>();
-            if (tapArea != null) tapArea.onClick.AddListener(StartFromMenu);
+            GameEvents.OnReturnToMenu += HandleReturnToMenu;
+            FishShop.OnBalanceChanged += UpdateCoins;
+        }
+
+        private void OnDestroy()
+        {
+            GameEvents.OnReturnToMenu -= HandleReturnToMenu;
+            FishShop.OnBalanceChanged -= UpdateCoins;
+        }
+
+        private void HandleReturnToMenu()
+        {
+            gameObject.SetActive(true);
+            UpdateCoins(FishShop.Balance);
+        }
+
+        private void UpdateCoins(int balance)
+        {
+            if (coinBalanceText != null) coinBalanceText.text = balance.ToString();
+        }
+
+        /// <param name="menuBackdrop">Full-screen dim that lives outside the safe area; shown and hidden with the menu.</param>
+        public void Configure(TMP_Text title, TMP_Text how, Button play, TMP_Text best, GameObject menuBackdrop = null)
+        {
+            backdrop = menuBackdrop;
+            if (backdrop != null) backdrop.SetActive(isActiveAndEnabled);
+            titleText = title;
+            instructionText = how;
+            if (playButton != null) playButton.onClick.RemoveListener(StartFromMenu);
+            playButton = play;
+            if (playButton != null) playButton.onClick.AddListener(StartFromMenu);
+            bestScoreText = best;
+            UpdateBestScore();
         }
 
         private void StartFromMenu()
@@ -46,23 +76,25 @@ namespace Upstream.UI
             GameEvents.OnGameStart += HandleGameStart;
             LocalizationManager.OnLanguageChanged += UpdateBestScore;
             UpdateBestScore();
+            if (backdrop != null) backdrop.SetActive(true);
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= HandleGameStart;
             LocalizationManager.OnLanguageChanged -= UpdateBestScore;
+            if (backdrop != null) backdrop.SetActive(false);
         }
 
         private void Update()
         {
             if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Menu)
             {
-                if (tapToStartText != null)
+                if (playButton != null)
                 {
-                    Color c = tapToStartText.color;
-                    c.a = 0.45f + Mathf.PingPong(Time.unscaledTime * 1.4f, 0.55f);
-                    tapToStartText.color = c;
+                    // Gentle "breathing" pulse so the Play button draws the eye.
+                    float scale = 1f + 0.05f * Mathf.Sin(Time.unscaledTime * 3f);
+                    playButton.transform.localScale = new Vector3(scale, scale, 1f);
                 }
 
                 if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)

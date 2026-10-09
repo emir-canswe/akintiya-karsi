@@ -29,6 +29,7 @@ namespace Upstream.Spawning
         private ObjectPool<RockObstacle> rockPool;
         private ObjectPool<LogObstacle> logPool;
         private ObjectPool<HookTrap> hookPool;
+        private ObjectPool<CoinPickup> coinPool;
 
         private float nextSpawnDistance = 120f;
         private readonly List<EntityBase> activeEntities = new List<EntityBase>(64);
@@ -47,7 +48,8 @@ namespace Upstream.Spawning
             ObjectPool<RockObstacle> rocks,
             ObjectPool<LogObstacle> logs,
             ObjectPool<HookTrap> hooks,
-            DifficultyScaler difficulty = null)
+            DifficultyScaler difficulty = null,
+            ObjectPool<CoinPickup> coins = null)
         {
             spawnConfig = sConfig;
             gameConfig = gConfig;
@@ -61,18 +63,21 @@ namespace Upstream.Spawning
             logPool = logs;
             hookPool = hooks;
             difficultyScaler = difficulty;
+            coinPool = coins;
         }
 
         private void OnEnable()
         {
             GameEvents.OnGameStart += HandleGameStart;
             GameEvents.OnContinueUsed += HandleContinueUsed;
+            GameEvents.OnReturnToMenu += ClearAllEntities;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= HandleGameStart;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
+            GameEvents.OnReturnToMenu -= ClearAllEntities;
         }
 
         private void Update()
@@ -117,7 +122,7 @@ namespace Upstream.Spawning
             for (int i = activeEntities.Count - 1; i >= 0; i--)
             {
                 var e = activeEntities[i];
-                if (e.Type != EntityType.Food && e.Type != EntityType.GoldFood && e.yPosition < 180f)
+                if (e.Type != EntityType.Food && e.Type != EntityType.GoldFood && e.Type != EntityType.Coin && e.yPosition < 180f)
                 {
                     ReturnToPool(e);
                     activeEntities.RemoveAt(i);
@@ -256,6 +261,13 @@ namespace Upstream.Spawning
                         gold.OnSpawn(new Vector2(Random.Range(-rw + 32f, rw - 32f), startY + n * 34f + 40f));
                         activeEntities.Add(gold);
                     }
+
+                    // Coin arc in the other half of the river: grab the food or the coins, not both.
+                    if (Random.value < 0.45f)
+                    {
+                        float coinX = x > 0f ? Random.Range(-rw + 34f, -20f) : Random.Range(20f, rw - 34f);
+                        SpawnCoinLine(coinX, startY + 10f, Random.Range(4, 7), 30f, 14f);
+                    }
                     break;
                 }
 
@@ -277,6 +289,13 @@ namespace Upstream.Spawning
                     var food = foodPool.Get();
                     food.OnSpawn(new Vector2(-side * Random.Range(42f, rw - 40f), startY + 25f));
                     activeEntities.Add(food);
+
+                    // Risky coins hugging the rock line.
+                    if (Random.value < 0.5f)
+                    {
+                        float coinX = Mathf.Clamp(x - side * 36f, -rw + 30f, rw - 30f);
+                        SpawnCoinLine(coinX, startY + 110f, 2, 28f, 0f);
+                    }
                     break;
                 }
 
@@ -303,6 +322,9 @@ namespace Upstream.Spawning
                     var food = foodPool.Get();
                     food.OnSpawn(new Vector2(side < 0f ? rw - 38f : -rw + 38f, startY));
                     activeEntities.Add(food);
+
+                    // Coins trailing the safe passage (spawned above the screen like everything else).
+                    SpawnCoinLine(side < 0f ? rw - 38f : -rw + 38f, startY + 44f, 3, 30f, 0f);
                     break;
                 }
 
@@ -335,8 +357,29 @@ namespace Upstream.Spawning
                     var food = foodPool.Get();
                     food.OnSpawn(new Vector2(foodX, startY + 80f));
                     activeEntities.Add(food);
+
+                    // Tempting coins just beside the hook's swing.
+                    if (Random.value < 0.4f)
+                    {
+                        float coinX = Mathf.Clamp(hookX + (hookX > 0f ? -48f : 48f), -rw + 30f, rw - 30f);
+                        SpawnCoinLine(coinX, startY + 20f, 3, 28f, 0f);
+                    }
                     break;
                 }
+            }
+        }
+
+        /// <summary>Vertical line of coins starting at (x, y) going upstream, with an optional sideways wave.</summary>
+        private void SpawnCoinLine(float x, float y, int count, float spacing, float wave)
+        {
+            if (coinPool == null) return;
+            float rw = gameConfig != null ? gameConfig.riverHalfWidth : 150f;
+            for (int i = 0; i < count; i++)
+            {
+                var coin = coinPool.Get();
+                float cx = Mathf.Clamp(x + Mathf.Sin(i * 0.8f) * wave, -rw + 24f, rw - 24f);
+                coin.OnSpawn(new Vector2(cx, y + i * spacing));
+                activeEntities.Add(coin);
             }
         }
 
@@ -352,6 +395,7 @@ namespace Upstream.Spawning
                 case EntityType.Rock: rockPool?.Return((RockObstacle)entity); break;
                 case EntityType.Log: logPool?.Return((LogObstacle)entity); break;
                 case EntityType.Hook: hookPool?.Return((HookTrap)entity); break;
+                case EntityType.Coin: coinPool?.Return((CoinPickup)entity); break;
             }
         }
     }

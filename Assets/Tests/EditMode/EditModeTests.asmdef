@@ -3,6 +3,7 @@
     "rootNamespace": "Upstream.Tests",
     "references": [
         "Upstream.Runtime",
+        "Unity.TextMeshPro",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

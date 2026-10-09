@@ -65,12 +65,14 @@ namespace Upstream.Mechanics
         {
             GameEvents.OnFoodEaten += OnFoodEaten;
             GameEvents.OnGameStart += ResetGrowth;
+            GameEvents.OnReturnToMenu += ResetGrowthSilently;
         }
 
         private void OnDisable()
         {
             GameEvents.OnFoodEaten -= OnFoodEaten;
             GameEvents.OnGameStart -= ResetGrowth;
+            GameEvents.OnReturnToMenu -= ResetGrowthSilently;
         }
 
         public void OnFoodEaten(bool isGold)
@@ -112,12 +114,17 @@ namespace Upstream.Mechanics
             }
         }
 
-        public void ResetGrowth()
+        public void ResetGrowth() => ResetGrowth(true);
+
+        // Back on the menu the fish shrinks to its start size without a "stage up" toast.
+        private void ResetGrowthSilently() => ResetGrowth(false);
+
+        private void ResetGrowth(bool announce)
         {
             var save = SaveSystem.Load();
             currentStageIndex = Config.GetStartStage(save.bestStageReached);
             totalFoodEaten = Config.stages[currentStageIndex].foodRequired;
-            GameEvents.OnGrowthStageChanged?.Invoke(currentStageIndex);
+            if (announce) GameEvents.OnGrowthStageChanged?.Invoke(currentStageIndex);
         }
     }
 }

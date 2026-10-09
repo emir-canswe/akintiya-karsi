@@ -56,11 +56,13 @@ namespace Upstream.Player
         {
             EnhancedTouchSupport.Enable();
             GameEvents.OnGameStart += ResetPosition;
+            GameEvents.OnReturnToMenu += ResetPosition;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= ResetPosition;
+            GameEvents.OnReturnToMenu -= ResetPosition;
         }
 
         public void ResetPosition()

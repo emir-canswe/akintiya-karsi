@@ -45,12 +45,14 @@ namespace Upstream.Mechanics
         private void OnEnable()
         {
             GameEvents.OnGameStart += ResetTurbo;
+            GameEvents.OnReturnToMenu += ResetTurbo;
             GameEvents.OnFoodEaten += HandleFoodEaten;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGameStart -= ResetTurbo;
+            GameEvents.OnReturnToMenu -= ResetTurbo;
             GameEvents.OnFoodEaten -= HandleFoodEaten;
         }
 

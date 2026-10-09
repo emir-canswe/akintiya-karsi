@@ -85,6 +85,13 @@ namespace Upstream.Spawning
                         }
                         break;
 
+                    case EntityType.Coin:
+                        if (Vector2.Distance(playerPos, ePos) < (pRadius + 13f))
+                        {
+                            ((CoinPickup)entity).Collect();
+                        }
+                        break;
+
                     case EntityType.GoldFood:
                         if (Vector2.Distance(playerPos, ePos) < (pRadius + 16f))
                         {

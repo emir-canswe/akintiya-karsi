@@ -7,6 +7,7 @@ using UnityEngine.UI;
 using TMPro;
 using Upstream.Ads;
 using Upstream.Core;
+using Upstream.Data;
 using Upstream.Mechanics;
 using Upstream.UI;
 
@@ -36,6 +37,7 @@ namespace Upstream.Tests
             Time.timeScale = 1f;
             AudioListener.pause = false;
             LocalizationManager.ResetCache();
+            UIBackStack.Clear();
             if (saveBackup != null) File.WriteAllText(savePath, saveBackup);
             else if (File.Exists(savePath)) File.Delete(savePath);
         }
@@ -66,10 +68,13 @@ namespace Upstream.Tests
             Assert.IsFalse(toast.gameObject.activeSelf, "Toast must start hidden (no stray 'TURBO!' on the menu).");
             Assert.IsFalse(hud.gameObject.activeSelf, "HUD hidden on menu.");
 
-            // Start
-            gm.StartGame();
+            // Start from the main menu's Play button, like a player would.
+            var menu = FindIncludingInactive<MainMenuScreen>();
+            Assert.IsTrue(menu.gameObject.activeSelf, "Main menu must be visible on launch.");
+            FindButton("PlayButton").onClick.Invoke();
             yield return null;
             Assert.AreEqual(GameState.Playing, gm.CurrentState);
+            Assert.IsFalse(menu.gameObject.activeSelf, "Main menu must hide when the run starts.");
             Assert.IsTrue(hud.gameObject.activeSelf, "HUD must appear when the run starts.");
 
             yield return new WaitForSeconds(0.5f);
@@ -144,6 +149,63 @@ namespace Upstream.Tests
             Assert.AreEqual(0, loaded.bestScore);
         }
 
+        [UnityTest]
+        public IEnumerator Coins_Shop_AndBackToMenu()
+        {
+            yield return null;
+            yield return null;
+
+            var gm = GameManager.Instance;
+            var menu = FindIncludingInactive<MainMenuScreen>();
+            var over = FindIncludingInactive<GameOverScreen>();
+            int balanceBefore = FishShop.Balance;
+
+            // A run with 5 coin pickups pays them (plus distance) into the wallet.
+            FindButton("PlayButton").onClick.Invoke();
+            yield return null;
+            for (int i = 0; i < 5; i++) GameEvents.OnCoinCollected?.Invoke(1);
+            gm.GameOver();
+            yield return new WaitForSecondsRealtime(gm.Config.deathAnimDuration + 0.2f);
+            float bonus = FishShop.Equipped.coinBonus;
+            Assert.AreEqual(FishShop.RunReward(5, gm.LastScore, bonus), gm.LastRunCoins);
+            Assert.AreEqual(balanceBefore + gm.LastRunCoins, FishShop.Balance);
+
+            // Game over -> main menu
+            FindButton("MenuBtn").onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(GameState.Menu, gm.CurrentState);
+            Assert.IsTrue(menu.gameObject.activeSelf, "Menu must come back.");
+            Assert.IsFalse(over.gameObject.activeSelf);
+
+            // Shop: buy and wear fish #1
+            var save = SaveSystem.Load();
+            save.coins = 1000;
+            save.ownedFish = new System.Collections.Generic.List<int> { 0 };
+            save.equippedFish = 0;
+            SaveSystem.Save(save);
+
+            FindButton("ShopButton").onClick.Invoke();
+            yield return null;
+            var shop = FindIncludingInactive<FishShopScreen>();
+            Assert.IsTrue(shop.gameObject.activeSelf);
+
+            FindButton("Fish_1").onClick.Invoke();
+            FindButton("ShopAction").onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(1, FishShop.Equipped.id, "Buying equips the fish.");
+            Assert.AreEqual(1000 - FishCatalog.Get(1).price, FishShop.Balance);
+
+            // Too expensive: nothing happens.
+            FindButton("Fish_19").onClick.Invoke();
+            FindButton("ShopAction").onClick.Invoke();
+            yield return null;
+            Assert.IsFalse(FishShop.Owns(19));
+
+            // Android back closes the shop instead of quitting.
+            Assert.IsTrue(UIBackStack.TryPop());
+            Assert.IsFalse(shop.gameObject.activeSelf);
+        }
+
         private static Button FindButton(string objectName)
         {
             foreach (var b in Object.FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
@@ -174,11 +236,21 @@ namespace Upstream.Tests
             }
             Assert.IsNotNull(title);
 
-            LocalizationManager.SetLanguage("en");
+            // Tapping the sound row flips mute and back.
+            var audio = Upstream.Audio.AudioManager.Instance;
+            Assert.IsNotNull(audio);
+            bool wasMuted = audio.IsMuted;
+            FindButton("SoundRow").onClick.Invoke();
+            Assert.AreNotEqual(wasMuted, audio.IsMuted);
+            FindButton("SoundRow").onClick.Invoke();
+            Assert.AreEqual(wasMuted, audio.IsMuted);
+
+            // TR / EN picker switches the language live.
+            FindButton("LangEN").onClick.Invoke();
             yield return null;
             StringAssert.Contains("UPSTREAM", title.text);
 
-            LocalizationManager.SetLanguage("tr");
+            FindButton("LangTR").onClick.Invoke();
             yield return null;
             StringAssert.Contains("KARŞI", title.text);
 

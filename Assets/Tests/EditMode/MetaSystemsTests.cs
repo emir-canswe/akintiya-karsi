@@ -1,5 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
 using Upstream.Ads;
 using Upstream.Core;
@@ -9,6 +10,23 @@ namespace Upstream.Tests
 {
     public class MetaSystemsTests
     {
+        // --- Text rendering ---
+
+        [Test]
+        public void TmpDefaultFont_Exists_SoRuntimeBuiltUiShowsText()
+        {
+            // All UI is built in code without assigning a font; without TMP Essential Resources every label is invisible.
+            Assert.IsNotNull(TMP_Settings.defaultFontAsset, "Import TMP Essential Resources (Window > TextMeshPro).");
+        }
+
+        [Test]
+        public void TmpDefaultFont_CanRenderTurkishCharacters()
+        {
+            TMP_FontAsset font = TMP_Settings.defaultFontAsset;
+            Assume.That(font, Is.Not.Null);
+            Assert.IsTrue(font.HasCharacters("çğıöşüÇĞİÖŞÜ", out _, true, true), "Default font (with fallbacks) is missing Turkish glyphs.");
+        }
+
         // --- Localization ---
 
         [Test]
@@ -28,7 +46,7 @@ namespace Upstream.Tests
         [Test]
         public void FormatKeys_HavePlaceholderInEveryLanguage()
         {
-            string[] formatKeys = { "best_score", "devour_toast", "unlock_note", "start_stage_unlocked" };
+            string[] formatKeys = { "best_score", "devour_toast", "unlock_note", "start_stage_unlocked", "buy_for", "need_more", "perk_coin", "coins_earned" };
             foreach (string key in formatKeys)
             {
                 foreach (string lang in LocalizationManager.Languages)
@@ -120,7 +138,7 @@ namespace Upstream.Tests
         {
             var v1 = new SaveData { version = 1, bestScore = 120, unlockedStartStage = 1 };
             SaveSystem.Migrate(v1);
-            Assert.AreEqual(2, v1.version);
+            Assert.AreEqual(3, v1.version, "Migrates all the way to the current version.");
             Assert.AreEqual(120, v1.bestScore);
             Assert.GreaterOrEqual(v1.bestStageReached, 1);
             Assert.IsFalse(v1.adsRemoved);
