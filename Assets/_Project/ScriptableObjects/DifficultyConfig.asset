@@ -12,26 +12,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df80a6d31c96ecc498f148b8ea39794d, type: 3}
   m_Name: DifficultyConfig
   m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.DifficultyConfig
-  difficultyRampDistance: 5000
+  difficultyRampDistance: 12000
+  startingDifficulty: 0.15
   regions:
   - regionName: Mountain Creek
     startDistance: 0
-    waterColor1: {r: 0.2, g: 0.8, b: 0.9, a: 1}
-    waterColor2: {r: 0.1, g: 0.6, b: 0.7, a: 1}
+    waterColor1: {r: 0.36, g: 0.9, b: 0.95, a: 1}
+    waterColor2: {r: 0.1, g: 0.64, b: 0.88, a: 1}
     bankColor: {r: 0.3, g: 0.6, b: 0.2, a: 1}
     grassColor: {r: 0.4, g: 0.8, b: 0.3, a: 1}
     speedMultiplier: 1
   - regionName: Wide Lake
     startDistance: 10000
-    waterColor1: {r: 0.1, g: 0.3, b: 0.8, a: 1}
-    waterColor2: {r: 0.05, g: 0.2, b: 0.6, a: 1}
+    waterColor1: {r: 0.42, g: 0.72, b: 1, a: 1}
+    waterColor2: {r: 0.2, g: 0.42, b: 0.92, a: 1}
     bankColor: {r: 0.9, g: 0.8, b: 0.6, a: 1}
     grassColor: {r: 0.8, g: 0.7, b: 0.5, a: 1}
     speedMultiplier: 0.9
   - regionName: Rapids
     startDistance: 20000
-    waterColor1: {r: 0.36, g: 0.7, b: 0.74, a: 1}
-    waterColor2: {r: 0.22, g: 0.5, b: 0.58, a: 1}
+    waterColor1: {r: 0.3, g: 0.9, b: 0.78, a: 1}
+    waterColor2: {r: 0.06, g: 0.62, b: 0.58, a: 1}
     bankColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
     grassColor: {r: 0.4, g: 0.4, b: 0.4, a: 1}
     speedMultiplier: 1.15

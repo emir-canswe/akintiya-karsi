@@ -23,6 +23,7 @@ namespace Upstream.UI
             public TMP_Text priceText;
             public TMP_Text nameText;
             public GameObject coinIcon;
+            public Image chip;
         }
 
         private static readonly Color BuyColor = new Color(1f, 0.54f, 0.36f, 1f);
@@ -30,6 +31,8 @@ namespace Upstream.UI
         private static readonly Color EquippedColor = new Color(1f, 1f, 1f, 0.14f);
         private static readonly Color DisabledColor = new Color(1f, 1f, 1f, 0.10f);
         private static readonly Color DarkText = new Color(0.17f, 0.05f, 0f, 1f);
+        private static readonly Color PriceChip = new Color(0.04f, 0.10f, 0.35f, 0.75f);
+        private static readonly Color OwnedChip = new Color(0.25f, 0.72f, 0.40f, 1f);
 
         private FishPreview bigPreview;
         private TMP_Text nameText;
@@ -41,6 +44,10 @@ namespace Upstream.UI
         private TMP_Text balanceText;
         private Card[] cards;
         private RectTransform previewPop;
+
+        private Image rarityPill;
+        private Image previewGlow;
+        private RawImage sunlight;
 
         private int selectedId;
         private float popTime = 1f;
@@ -66,6 +73,14 @@ namespace Upstream.UI
                 int id = card.fish.id;
                 card.button.onClick.AddListener(() => Select(id));
             }
+        }
+
+        /// <summary>Rarity badge, glow behind the big fish, and the drifting sunlight backdrop.</summary>
+        public void SetDecor(Image rarityBadge, Image glow, RawImage sunlightLayer)
+        {
+            rarityPill = rarityBadge;
+            previewGlow = glow;
+            sunlight = sunlightLayer;
         }
 
         private void Awake()
@@ -124,10 +139,19 @@ namespace Upstream.UI
 
         private void Update()
         {
-            if (previewPop == null || popTime >= 1f) return;
-            popTime = Mathf.Min(1f, popTime + Time.unscaledDeltaTime * 4f);
-            float s = 1f + Mathf.Sin(popTime * Mathf.PI) * 0.12f;
-            previewPop.localScale = new Vector3(s, s, 1f);
+            float t = Time.unscaledTime;
+
+            // Sunlight drifts over the backdrop; the big fish swims back and forth in its tank.
+            if (sunlight != null) sunlight.uvRect = new Rect(Mathf.Sin(t * 0.1f) * 0.2f, t * 0.04f, 2.2f, 4.5f);
+            if (previewPop != null)
+            {
+                previewPop.anchoredPosition = new Vector2(Mathf.Sin(t * 0.7f) * 40f, Mathf.Sin(t * 1.6f) * 5f);
+                // Faces the way it swims: right when moving right, flipped when moving left.
+                float dir = Mathf.Cos(t * 0.7f) >= 0f ? 1f : -1f;
+                float pop = popTime < 1f ? 1f + Mathf.Sin(popTime * Mathf.PI) * 0.12f : 1f;
+                previewPop.localScale = new Vector3(pop, pop * dir, 1f);
+            }
+            if (popTime < 1f) popTime = Mathf.Min(1f, popTime + Time.unscaledDeltaTime * 4f);
         }
 
         private void Refresh()
@@ -143,8 +167,10 @@ namespace Upstream.UI
             // Detail panel
             bigPreview.SetFish(fish);
             nameText.text = fish.Name;
+            Color rarityColor = FishCatalog.RarityColor(fish.rarity);
             rarityText.text = LocalizationManager.Get($"rarity_{(int)fish.rarity}");
-            rarityText.color = FishCatalog.RarityColor(fish.rarity);
+            if (rarityPill != null) rarityPill.color = rarityColor;
+            if (previewGlow != null) previewGlow.color = new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.55f);
             perkText.text = PerkText(fish);
 
             if (equipped)
@@ -171,25 +197,30 @@ namespace Upstream.UI
                 bool cardEquipped = save.equippedFish == card.fish.id;
                 bool selected = card.fish.id == selectedId;
 
-                Color rarity = FishCatalog.RarityColor(card.fish.rarity);
-                card.frame.color = selected ? Color.white : new Color(rarity.r, rarity.g, rarity.b, 0.55f);
+                card.frame.color = selected ? Color.white : FishCatalog.RarityColor(card.fish.rarity);
 
                 card.nameText.text = card.fish.Name;
                 card.coinIcon.SetActive(!cardOwned);
+                // Price tag, or a status chip once owned
+                RectTransform priceRt = card.priceText.rectTransform;
+                priceRt.offsetMin = new Vector2(cardOwned ? 0f : 16f, 0f);
                 if (cardEquipped)
                 {
                     card.priceText.text = LocalizationManager.Get("equipped_short");
-                    card.priceText.color = BuyColor;
+                    card.priceText.color = Color.white;
+                    card.chip.color = BuyColor;
                 }
                 else if (cardOwned)
                 {
                     card.priceText.text = LocalizationManager.Get("owned");
-                    card.priceText.color = SelectColor;
+                    card.priceText.color = Color.white;
+                    card.chip.color = OwnedChip;
                 }
                 else
                 {
                     card.priceText.text = card.fish.price.ToString();
-                    card.priceText.color = save.coins >= card.fish.price ? new Color(1f, 0.84f, 0.35f, 1f) : new Color(1f, 1f, 1f, 0.55f);
+                    card.priceText.color = save.coins >= card.fish.price ? new Color(1f, 0.86f, 0.3f, 1f) : new Color(1f, 1f, 1f, 0.6f);
+                    card.chip.color = PriceChip;
                 }
             }
         }

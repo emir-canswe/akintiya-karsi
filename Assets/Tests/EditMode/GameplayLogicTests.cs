@@ -92,6 +92,20 @@ namespace Upstream.Tests
         // --- Difficulty / regions ---
 
         [Test]
+        public void SpeedForDistance_StartsAtStart_AndNeverPlateaus()
+        {
+            Assert.AreEqual(160f, DifficultyScaler.SpeedForDistance(0f, 160f, 420f), 1e-3f);
+            float prev = 0f;
+            foreach (float m in new[] { 0f, 100f, 500f, 1000f, 2000f, 3000f })
+            {
+                float v = DifficultyScaler.SpeedForDistance(m, 160f, 420f);
+                Assert.Greater(v, prev, $"speed must keep rising at {m} m");
+                prev = v;
+            }
+            Assert.LessOrEqual(DifficultyScaler.SpeedForDistance(1e6f, 160f, 420f), 420f * 1.35f + 1e-3f, "capped");
+        }
+
+        [Test]
         public void CalculateDifficulty_IsClampedLinearRamp()
         {
             Assert.AreEqual(0f, DifficultyScaler.CalculateDifficulty(0f, 5000f), 1e-5f);

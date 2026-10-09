@@ -26,6 +26,10 @@ namespace Upstream.UI
         [SerializeField] private ScoreSystem scoreSystem;
 
         private TMP_Text coinsEarnedText;
+        private RectTransform card;
+        private float cardHeightWithContinue;
+        private float cardHeightWithoutContinue;
+        private float animTime = 1f;
         private Button menuButton;
         private IAdsService adsService;
         private bool hasContinued;
@@ -62,6 +66,14 @@ namespace Upstream.UI
             coinsEarnedText = coinsText;
             menuButton = menuBtn;
             BindButtons();
+        }
+
+        /// <summary>Card to pop in and resize (taller when the continue button is offered).</summary>
+        public void SetCard(RectTransform cardRect, float heightWithContinue, float heightWithoutContinue)
+        {
+            card = cardRect;
+            cardHeightWithContinue = heightWithContinue;
+            cardHeightWithoutContinue = heightWithoutContinue;
         }
 
         // Subscribed in Awake/OnDestroy (not OnEnable/OnDisable): this screen starts hidden, and an
@@ -123,6 +135,11 @@ namespace Upstream.UI
 
             bool canContinue = !hasContinued && CurrentScore() >= MinScoreForContinue;
             if (continueButton != null) continueButton.gameObject.SetActive(canContinue);
+            if (card != null)
+            {
+                card.sizeDelta = new Vector2(card.sizeDelta.x, canContinue ? cardHeightWithContinue : cardHeightWithoutContinue);
+            }
+            animTime = 0f; // card pop + score count-up
         }
 
         private int CurrentScore()
@@ -159,6 +176,35 @@ namespace Upstream.UI
             if (continueLabel != null && !waitingForAd)
             {
                 continueLabel.text = LocalizationManager.Get("watch_ad_continue");
+            }
+        }
+
+        private void Update()
+        {
+            if (animTime >= 1.2f) return;
+            animTime += Time.unscaledDeltaTime;
+
+            // Card pops in with a little overshoot
+            if (card != null)
+            {
+                float k = Mathf.Clamp01(animTime / 0.35f);
+                float s = k < 1f ? Mathf.LerpUnclamped(0.7f, 1f, 1f + 2.2f * Mathf.Pow(k - 1f, 3f) + 1.2f * Mathf.Pow(k - 1f, 2f)) : 1f;
+                card.localScale = new Vector3(s, s, 1f);
+            }
+
+            // Distance counts up from 0
+            if (scoreText != null)
+            {
+                float t = Mathf.Clamp01((animTime - 0.15f) / 0.7f);
+                int shown = Mathf.RoundToInt(CurrentScore() * (1f - Mathf.Pow(1f - t, 3f)));
+                scoreText.text = $"{shown}<size=45%>m</size>";
+            }
+
+            // NEW BEST sticker throbs
+            if (newBestBadge != null && newBestBadge.activeSelf)
+            {
+                float b = 1f + 0.08f * Mathf.Sin(animTime * 12f) * Mathf.Clamp01(1.2f - animTime);
+                newBestBadge.transform.localScale = new Vector3(b, b, 1f);
             }
         }
 

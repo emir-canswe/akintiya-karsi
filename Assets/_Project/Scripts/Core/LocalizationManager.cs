@@ -36,6 +36,8 @@ namespace Upstream.Core
             { "start_stage_unlocked", new Entry("Artık <b>{0}</b> olarak başlıyorsun", "You now start as <b>{0}</b>") },
 
             // Game over
+            { "wave_toast", new Entry("DALGA! Yavaşladın", "WAVE! Slowed down") },
+            { "distance_label", new Entry("MESAFE", "DISTANCE") },
             { "game_over_title", new Entry("BALIK YORULDU", "OUT OF BREATH") },
             { "new_best", new Entry("YENİ REKOR!", "NEW BEST!") },
             { "play_again", new Entry("Tekrar Oyna", "Play Again") },
@@ -45,13 +47,12 @@ namespace Upstream.Core
             { "unlock_note", new Entry("YENİ: Artık {0} olarak başlıyorsun!", "NEW: You now start as {0}!") },
 
             // HUD / toasts
-            { "sound_short_on", new Entry("SES", "SOUND") },
-            { "sound_short_off", new Entry("KAPALI", "OFF") },
             { "turbo_toast", new Entry("TURBO!", "TURBO!") },
             { "heal_toast", new Entry("+1 CAN", "+1 LIFE") },
             { "power_toast", new Entry("+GÜÇ!", "+POWER!") },
             { "devour_toast", new Entry("+{0}m YUTTUN!", "+{0}m DEVOURED!") },
-            { "paused", new Entry("DURAKLATILDI\n<size=55%>Devam etmek için dokun</size>", "PAUSED\n<size=55%>Tap to continue</size>") },
+            { "paused", new Entry("DURAKLATILDI", "PAUSED") },
+            { "resume_btn", new Entry("DEVAM ET", "RESUME") },
 
             // Growth stages (names / HUD badge / stage-up toast)
             { "stage_name_0", new Entry("YAVRU", "FRY") },

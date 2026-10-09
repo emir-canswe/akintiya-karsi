@@ -6,29 +6,29 @@ using Upstream.Data;
 namespace Upstream.River
 {
     /// <summary>
-    /// Renders the scrolling watercolor river, animated current streaks, sandy/grassy riverbanks,
-    /// deterministic bank decorations (reeds, stones, bushes), and pooled splash particles.
-    /// Smoothly blends colors across regions (Mountain Creek -> Wide Lake -> Rapids).
+    /// Renders the bright cartoon river: deep-to-light water gradient, scrolling sunlight caustics, glints and
+    /// bubbles, grassy banks with a sandy, foamy shore, bank decorations (trees, flower bushes, mushrooms,
+    /// stones, lily pads) and pooled sparkle/bubble bursts. Water colors blend between regions.
     /// </summary>
     public class RiverVisualRenderer : MonoBehaviour
     {
         [SerializeField] private RiverController riverController;
         [SerializeField] private GameConfig gameConfig;
 
-        private SpriteRenderer waterCenterRenderer;
-        private SpriteRenderer waterLeftRenderer;
-        private SpriteRenderer waterRightRenderer;
-        private SpriteRenderer leftSandRenderer;
-        private SpriteRenderer rightSandRenderer;
-        private SpriteRenderer leftGrassRenderer;
-        private SpriteRenderer rightGrassRenderer;
+        private const float TileH = 128f; // world height of one grass/shore/caustics tile
+        private const float BankWidth = 220f;
 
-        private Transform[] currentStreaks;
+        private SpriteRenderer waterDeep;
+        private SpriteRenderer waterGlow;
+        private SpriteRenderer causticsNear;
+        private SpriteRenderer causticsFar;
+        private Transform leftGrass, rightGrass, leftShore, rightShore;
+
+        private Transform[] glints;
+        private Transform[] bubbles;
         private Transform[] bankDecos;
-        private int[] bankDecoSides;
-        private int[] bankDecoIndices;
+        private float[] bankDecoX;
 
-        // Simple pooled burst particles
         private struct BurstParticle
         {
             public Transform transform;
@@ -36,11 +36,15 @@ namespace Upstream.River
             public Vector2 velocity;
             public float life;
             public float maxLife;
+            public float size;
+            public float spin;
             public Color baseColor;
             public bool active;
         }
 
         private BurstParticle[] particles;
+        private Player.PlayerController player;
+        private float bubbleTimer;
 
         public void Configure(RiverController controller, GameConfig config)
         {
@@ -61,6 +65,8 @@ namespace Upstream.River
             GameEvents.OnPlayerHurt += HandlePlayerHurt;
             GameEvents.OnSharkEaten += HandleSharkEaten;
             GameEvents.OnGrowthStageChanged += HandleStageUp;
+            GameEvents.OnCoinCollected += HandleCoinCollected;
+            GameEvents.OnWaveHit += HandleWaveHit;
         }
 
         private void OnDisable()
@@ -69,46 +75,75 @@ namespace Upstream.River
             GameEvents.OnPlayerHurt -= HandlePlayerHurt;
             GameEvents.OnSharkEaten -= HandleSharkEaten;
             GameEvents.OnGrowthStageChanged -= HandleStageUp;
+            GameEvents.OnCoinCollected -= HandleCoinCollected;
+            GameEvents.OnWaveHit -= HandleWaveHit;
         }
+
+        private float RiverHalfWidth => gameConfig != null ? gameConfig.riverHalfWidth : 150f;
 
         private void BuildRiverVisuals()
         {
-            float rw = gameConfig != null ? gameConfig.riverHalfWidth : 150f;
-            Sprite white = WatercolorSpriteFactory.GetWhiteSprite();
+            float rw = RiverHalfWidth;
             // Tall enough for the fitted camera view (taller on narrow phones) plus shake/zoom margin.
             float quadH = GameCamera.ViewHalfHeight * 2f + 150f;
+            float tiledH = quadH + TileH * 2f;
 
-            // Water background layers
-            waterLeftRenderer = CreateQuad("WaterLeft", new Vector3(-rw * 0.5f, 0f, 5f), new Vector3(rw, quadH, 1f), new Color(0.11f, 0.49f, 0.60f), -20, white);
-            waterRightRenderer = CreateQuad("WaterRight", new Vector3(rw * 0.5f, 0f, 5f), new Vector3(rw, quadH, 1f), new Color(0.11f, 0.49f, 0.60f), -20, white);
-            waterCenterRenderer = CreateQuad("WaterCenter", new Vector3(0f, 0f, 4.9f), new Vector3(rw * 1.15f, quadH, 1f), new Color(0.16f, 0.64f, 0.77f), -19, white);
+            // Water: deep color everywhere, lighter band down the middle, two layers of sunlight.
+            waterDeep = CreateRenderer("WaterDeep", new Vector3(0f, 0f, 5f), WatercolorSpriteFactory.GetWhiteSprite(), -20);
+            waterDeep.transform.localScale = new Vector3(rw * 2f + 20f, quadH, 1f);
+            waterDeep.color = new Color(0.10f, 0.65f, 0.85f);
 
-            // Sand & Grass riverbanks
-            float bankWidth = 220f;
-            leftSandRenderer = CreateQuad("LeftSand", new Vector3(-rw - bankWidth * 0.5f, 0f, 2f), new Vector3(bankWidth, quadH, 1f), new Color(0.89f, 0.79f, 0.56f), -5, white);
-            rightSandRenderer = CreateQuad("RightSand", new Vector3(rw + bankWidth * 0.5f, 0f, 2f), new Vector3(bankWidth, quadH, 1f), new Color(0.89f, 0.79f, 0.56f), -5, white);
+            waterGlow = CreateRenderer("WaterGlow", new Vector3(0f, 0f, 4.9f), CartoonSpriteFactory.GetWaterGlow(), -19);
+            waterGlow.transform.localScale = new Vector3(rw * 2f / 64f, quadH / 4f, 1f);
+            waterGlow.color = new Color(0.31f, 0.89f, 0.94f);
 
-            leftGrassRenderer = CreateQuad("LeftGrass", new Vector3(-rw - 16f - bankWidth * 0.5f, 0f, 1.9f), new Vector3(bankWidth, quadH, 1f), new Color(0.35f, 0.64f, 0.35f), -4, white);
-            rightGrassRenderer = CreateQuad("RightGrass", new Vector3(rw + 16f + bankWidth * 0.5f, 0f, 1.9f), new Vector3(bankWidth, quadH, 1f), new Color(0.35f, 0.64f, 0.35f), -4, white);
+            causticsFar = CreateTiled("CausticsFar", CartoonSpriteFactory.GetCaustics(), -18, new Vector2(rw * 2f, tiledH), 0f);
+            causticsFar.transform.localScale = new Vector3(1.6f, 1.6f, 1f);
+            causticsFar.size = new Vector2(rw * 2f / 1.6f, tiledH / 1.6f + TileH);
+            causticsFar.color = new Color(1f, 1f, 1f, 0.10f);
+            causticsNear = CreateTiled("CausticsNear", CartoonSpriteFactory.GetCaustics(), -17, new Vector2(rw * 2f, tiledH), 0f);
+            causticsNear.color = new Color(1f, 1f, 1f, 0.17f);
 
-            // 18 Scrolling current streaks
-            currentStreaks = new Transform[18];
-            for (int i = 0; i < currentStreaks.Length; i++)
+            // Banks: tiled grass, then the sand/foam shore strip whose foam line sits on the water's edge.
+            Sprite grass = CartoonSpriteFactory.GetGrassTile();
+            leftGrass = CreateTiled("LeftGrass", grass, -6, new Vector2(BankWidth, tiledH), -rw - BankWidth * 0.5f - 10f).transform;
+            rightGrass = CreateTiled("RightGrass", grass, -6, new Vector2(BankWidth, tiledH), rw + BankWidth * 0.5f + 10f).transform;
+
+            Sprite shore = CartoonSpriteFactory.GetShoreTile();
+            // Shore tile is 40 wide with its foam at x≈33: place it so the foam line meets x = ±rw.
+            leftShore = CreateTiled("LeftShore", shore, -5, new Vector2(40f, tiledH), -rw - 13f).transform;
+            var rs = CreateTiled("RightShore", shore, -5, new Vector2(40f, tiledH), rw + 13f);
+            rs.flipX = true;
+            rightShore = rs.transform;
+
+            // Surface glints and drifting bubbles
+            glints = new Transform[14];
+            for (int i = 0; i < glints.Length; i++)
             {
-                float h = 24f + (i % 3) * 8f;
-                var sr = CreateQuad($"Streak_{i}", Vector3.zero, new Vector3(2.4f, h, 1f), new Color(1f, 1f, 1f, 0.16f), -15, white);
-                currentStreaks[i] = sr.transform;
+                var sr = CreateRenderer($"Glint_{i}", Vector3.zero, CartoonSpriteFactory.GetGlint(), -15);
+                sr.color = new Color(1f, 1f, 1f, 0.28f);
+                sr.transform.localScale = new Vector3(0.7f, 0.6f + (i % 3) * 0.25f, 1f);
+                glints[i] = sr.transform;
+            }
+            bubbles = new Transform[8];
+            for (int i = 0; i < bubbles.Length; i++)
+            {
+                var sr = CreateRenderer($"Bubble_{i}", Vector3.zero, CartoonSpriteFactory.GetBubble(), -14);
+                sr.color = new Color(1f, 1f, 1f, 0.7f);
+                sr.transform.localScale = Vector3.one * (0.35f + Hash01(i, 3, 1) * 0.35f);
+                bubbles[i] = sr.transform;
             }
 
-            // Bank decorations (16 per side = 32 total)
-            int perSide = 16;
-            bankDecos = new Transform[perSide * 2];
-            bankDecoSides = new int[perSide * 2];
-            bankDecoIndices = new int[perSide * 2];
+            BuildBankDecorations(rw);
+        }
 
-            Sprite reedSpr = WatercolorSpriteFactory.GetReedSprite();
-            Sprite bushSpr = WatercolorSpriteFactory.GetBushSprite();
-            Sprite rockSpr = WatercolorSpriteFactory.GetRockSprite();
+        private void BuildBankDecorations(float rw)
+        {
+            const int perSide = 16;
+            bankDecos = new Transform[perSide * 2];
+            bankDecoX = new float[perSide * 2];
+
+            Color[] stoneTints = { new Color(1f, 0.92f, 0.85f), new Color(0.85f, 0.92f, 1f), new Color(0.95f, 0.88f, 1f) };
 
             for (int s = 0; s < 2; s++)
             {
@@ -116,110 +151,153 @@ namespace Upstream.River
                 for (int i = 0; i < perSide; i++)
                 {
                     int idx = s * perSide + i;
-                    bankDecoSides[idx] = side;
-                    bankDecoIndices[idx] = i;
-
-                    GameObject decoObj = new GameObject($"BankDeco_{side}_{i}");
-                    decoObj.transform.SetParent(transform, false);
-                    var sr = decoObj.AddComponent<SpriteRenderer>();
-                    sr.sortingOrder = -2;
-
+                    var sr = CreateRenderer($"BankDeco_{side}_{i}", Vector3.zero, null, -3);
+                    Transform t = sr.transform;
                     float r = Hash01(i, side, 1);
-                    if (r < 0.45f) sr.sprite = reedSpr;
-                    else if (r < 0.75f)
-                    {
-                        sr.sprite = rockSpr;
-                        decoObj.transform.localScale = Vector3.one * 0.38f;
-                    }
-                    else sr.sprite = bushSpr;
+                    float jitter = Hash01(i, side, 2);
+                    float x;
 
-                    bankDecos[idx] = decoObj.transform;
+                    if (r < 0.22f)
+                    {
+                        // Tree canopy peeking in from the edge of the screen
+                        sr.sprite = CartoonSpriteFactory.GetTree();
+                        sr.sortingOrder = -2;
+                        t.localScale = Vector3.one * (0.75f + jitter * 0.3f);
+                        x = rw + 34f + jitter * 10f;
+                    }
+                    else if (r < 0.45f)
+                    {
+                        sr.sprite = CartoonSpriteFactory.GetFlowerBush();
+                        t.localScale = Vector3.one * (0.6f + jitter * 0.25f);
+                        x = rw + 22f + jitter * 8f;
+                    }
+                    else if (r < 0.58f)
+                    {
+                        sr.sprite = CartoonSpriteFactory.GetMushroom();
+                        t.localScale = Vector3.one * (0.42f + jitter * 0.15f);
+                        x = rw + 16f + jitter * 6f;
+                    }
+                    else if (r < 0.78f)
+                    {
+                        // Pebbles on the sand
+                        sr.sprite = CartoonSpriteFactory.GetStone();
+                        sr.color = stoneTints[i % stoneTints.Length];
+                        t.localScale = Vector3.one * (0.4f + jitter * 0.25f);
+                        x = rw + 7f + jitter * 7f;
+                    }
+                    else
+                    {
+                        // Lily pad floating at the very edge of the water (purely decorative)
+                        sr.sprite = CartoonSpriteFactory.GetLilyPad();
+                        sr.sortingOrder = -12;
+                        t.localScale = Vector3.one * (0.5f + jitter * 0.2f);
+                        x = rw - 9f - jitter * 4f;
+                    }
+                    t.localRotation = Quaternion.Euler(0f, 0f, jitter * 360f);
+                    bankDecos[idx] = t;
+                    bankDecoX[idx] = side * x;
                 }
             }
         }
 
         private void BuildParticlePool()
         {
-            particles = new BurstParticle[48];
-            Sprite glow = WatercolorSpriteFactory.GetCircleGlowSprite();
+            particles = new BurstParticle[64];
             for (int i = 0; i < particles.Length; i++)
             {
-                GameObject pObj = new GameObject($"Particle_{i}");
-                pObj.transform.SetParent(transform, false);
-                pObj.SetActive(false);
-                var sr = pObj.AddComponent<SpriteRenderer>();
-                sr.sprite = glow;
-                sr.sortingOrder = 15;
-                particles[i] = new BurstParticle
-                {
-                    transform = pObj.transform,
-                    renderer = sr,
-                    active = false
-                };
+                var sr = CreateRenderer($"Particle_{i}", Vector3.zero, CartoonSpriteFactory.GetSparkle(), 15);
+                sr.gameObject.SetActive(false);
+                particles[i] = new BurstParticle { transform = sr.transform, renderer = sr, active = false };
             }
         }
 
-        public void SpawnBurst(Vector2 pos, Color col, int count = 8, float speed = 85f, float size = 0.22f)
+        /// <summary>Sparkle (or bubble) burst. <paramref name="size"/> is the sprite scale.</summary>
+        public void SpawnBurst(Vector2 pos, Color col, int count = 8, float speed = 85f, float size = 0.22f, bool asBubbles = false)
         {
+            Sprite sprite = asBubbles ? CartoonSpriteFactory.GetBubble() : CartoonSpriteFactory.GetSparkle();
             int spawned = 0;
             for (int i = 0; i < particles.Length && spawned < count; i++)
             {
-                if (!particles[i].active)
-                {
-                    particles[i].active = true;
-                    particles[i].life = 0.5f;
-                    particles[i].maxLife = 0.5f;
-                    particles[i].baseColor = col;
-                    particles[i].velocity = Random.insideUnitCircle * speed;
-                    particles[i].transform.position = new Vector3(pos.x, pos.y, 0f);
-                    particles[i].transform.localScale = Vector3.one * size;
-                    particles[i].renderer.color = col;
-                    particles[i].transform.gameObject.SetActive(true);
-                    spawned++;
-                }
+                if (particles[i].active) continue;
+                ref BurstParticle p = ref particles[i];
+                p.active = true;
+                p.maxLife = p.life = Random.Range(0.4f, 0.65f);
+                p.baseColor = col;
+                p.velocity = Random.insideUnitCircle.normalized * speed * Random.Range(0.5f, 1f);
+                p.size = size * Random.Range(0.7f, 1.3f) * 3f; // sparkle sprite is ~3x smaller than the old glow
+                p.spin = Random.Range(-360f, 360f);
+                p.renderer.sprite = sprite;
+                p.renderer.color = col;
+                p.transform.position = new Vector3(pos.x, pos.y, 0f);
+                p.transform.localScale = Vector3.one * p.size;
+                p.transform.gameObject.SetActive(true);
+                spawned++;
             }
+        }
+
+        private Vector2 PlayerPos(Vector2 offset, Vector2 fallback)
+        {
+            if (player == null) player = FindFirstObjectByType<Player.PlayerController>();
+            return player != null ? player.Position + offset : fallback;
         }
 
         private void HandleFoodEaten(bool isGold)
         {
-            var player = FindFirstObjectByType<Player.PlayerController>();
-            Vector2 pos = player != null ? player.Position + new Vector2(0f, 18f) : new Vector2(0f, -120f);
-            Color c = isGold ? new Color(1f, 0.84f, 0.35f, 1f) : new Color(0.49f, 0.94f, 0.78f, 1f);
-            SpawnBurst(pos, c, 7, 75f, 0.20f);
+            Vector2 pos = PlayerPos(new Vector2(0f, 18f), new Vector2(0f, -120f));
+            if (isGold) SpawnBurst(pos, new Color(1f, 0.88f, 0.3f, 1f), 12, 120f, 0.30f);
+            else SpawnBurst(pos, new Color(1f, 1f, 1f, 0.9f), 6, 70f, 0.22f, asBubbles: true);
+        }
+
+        private void HandleCoinCollected(int amount)
+        {
+            Vector2 pos = PlayerPos(new Vector2(0f, 16f), new Vector2(0f, -120f));
+            SpawnBurst(pos, new Color(1f, 0.86f, 0.25f, 1f), 5, 90f, 0.20f);
+        }
+
+        private void HandleWaveHit()
+        {
+            Vector2 pos = PlayerPos(new Vector2(0f, 14f), new Vector2(0f, -120f));
+            SpawnBurst(pos, new Color(1f, 1f, 1f, 0.9f), 10, 110f, 0.26f, asBubbles: true);
         }
 
         private void HandlePlayerHurt(int hp)
         {
-            var player = FindFirstObjectByType<Player.PlayerController>();
-            Vector2 pos = player != null ? player.Position : new Vector2(0f, -140f);
-            SpawnBurst(pos, new Color(1f, 0.36f, 0.42f, 1f), 12, 110f, 0.25f);
+            Vector2 pos = PlayerPos(Vector2.zero, new Vector2(0f, -140f));
+            SpawnBurst(pos, new Color(1f, 0.35f, 0.45f, 1f), 12, 120f, 0.26f);
         }
 
         private void HandleSharkEaten()
         {
-            var player = FindFirstObjectByType<Player.PlayerController>();
-            Vector2 pos = player != null ? player.Position + new Vector2(0f, 24f) : new Vector2(0f, -120f);
-            SpawnBurst(pos, new Color(1f, 0.84f, 0.35f, 1f), 18, 160f, 0.34f);
+            Vector2 pos = PlayerPos(new Vector2(0f, 24f), new Vector2(0f, -120f));
+            SpawnBurst(pos, new Color(1f, 0.86f, 0.25f, 1f), 14, 170f, 0.34f);
+            SpawnBurst(pos, new Color(1f, 0.5f, 0.75f, 1f), 8, 130f, 0.26f);
         }
 
         private void HandleStageUp(int stage)
         {
             if (stage <= 0) return;
-            var player = FindFirstObjectByType<Player.PlayerController>();
-            Vector2 pos = player != null ? player.Position : new Vector2(0f, -140f);
-            SpawnBurst(pos, new Color(0.49f, 0.94f, 0.78f, 1f), 14, 130f, 0.28f);
+            Vector2 pos = PlayerPos(Vector2.zero, new Vector2(0f, -140f));
+            SpawnBurst(pos, new Color(0.45f, 1f, 0.8f, 1f), 10, 140f, 0.28f);
+            SpawnBurst(pos, new Color(1f, 0.95f, 0.5f, 1f), 8, 110f, 0.24f);
         }
 
-        private SpriteRenderer CreateQuad(string name, Vector3 pos, Vector3 scale, Color color, int sortOrder, Sprite sprite)
+        private SpriteRenderer CreateRenderer(string name, Vector3 pos, Sprite sprite, int sortOrder)
         {
             GameObject go = new GameObject(name);
             go.transform.SetParent(transform, false);
             go.transform.localPosition = pos;
-            go.transform.localScale = scale;
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
-            sr.color = color;
             sr.sortingOrder = sortOrder;
+            return sr;
+        }
+
+        private SpriteRenderer CreateTiled(string name, Sprite sprite, int sortOrder, Vector2 size, float x)
+        {
+            var sr = CreateRenderer(name, new Vector3(x, 0f, 2f), sprite, sortOrder);
+            sr.drawMode = SpriteDrawMode.Tiled;
+            sr.tileMode = SpriteTileMode.Continuous;
+            sr.size = size;
             return sr;
         }
 
@@ -232,65 +310,105 @@ namespace Upstream.River
         private void Update()
         {
             float scroll = riverController != null ? riverController.ScrollOffset : Time.time * 100f;
-            float rw = gameConfig != null ? gameConfig.riverHalfWidth : 150f;
+            float rw = RiverHalfWidth;
+            float viewH = GameCamera.ViewHalfHeight;
 
-            // Smooth region color transition
+            // Region color blend
             if (riverController != null && riverController.ActiveRegion != null)
             {
                 RegionData reg = riverController.ActiveRegion;
-                waterCenterRenderer.color = Color.Lerp(waterCenterRenderer.color, reg.waterColor1, Time.deltaTime * 2f);
-                waterLeftRenderer.color = Color.Lerp(waterLeftRenderer.color, reg.waterColor2, Time.deltaTime * 2f);
-                waterRightRenderer.color = Color.Lerp(waterRightRenderer.color, reg.waterColor2, Time.deltaTime * 2f);
+                waterGlow.color = Color.Lerp(waterGlow.color, reg.waterColor1, Time.deltaTime * 2f);
+                waterDeep.color = Color.Lerp(waterDeep.color, reg.waterColor2, Time.deltaTime * 2f);
             }
 
-            // Animate current streaks scrolling from just above the view to just below it
-            float viewH = GameCamera.ViewHalfHeight;
+            // Tiled layers scroll with the river (pattern repeats every tile, so wrap the offset).
+            float bankY = -Mathf.Repeat(scroll, TileH);
+            SetY(leftGrass, bankY);
+            SetY(rightGrass, bankY);
+            SetY(leftShore, bankY);
+            SetY(rightShore, bankY);
+            SetY(causticsNear.transform, -Mathf.Repeat(scroll * 1.05f, TileH));
+            SetY(causticsFar.transform, -Mathf.Repeat(scroll * 0.8f + Time.time * 6f, TileH * 1.6f));
+            Vector3 farPos = causticsFar.transform.localPosition;
+            farPos.x = Mathf.Sin(Time.time * 0.3f) * 10f; // slow sideways shimmer
+            causticsFar.transform.localPosition = farPos;
+
+            // Glints: drift with the water
             float spanY = (viewH + 40f) * 2f;
-            for (int i = 0; i < currentStreaks.Length; i++)
+            for (int i = 0; i < glints.Length; i++)
             {
                 float x = -rw + 18f + ((i * 53f) % ((rw - 18f) * 2f));
-                float rawY = (i * 97f - scroll * 1.1f) % spanY;
-                if (rawY < 0f) rawY += spanY;
-                float y = rawY - (viewH + 40f);
-                currentStreaks[i].localPosition = new Vector3(x + Mathf.Sin(i + Time.time * 2f) * 3f, y, 0f);
+                float y = Mathf.Repeat(i * 97f - scroll * 1.1f, spanY) - (viewH + 40f);
+                glints[i].localPosition = new Vector3(x + Mathf.Sin(i + Time.time * 2f) * 3f, y, 0f);
             }
 
-            // Animate bank decorations scrolling downward
+            // Bubbles: rise slowly against the current with a wobble
+            for (int i = 0; i < bubbles.Length; i++)
+            {
+                float x = -rw + 30f + Hash01(i, 1, 4) * (rw * 2f - 60f);
+                float y = Mathf.Repeat(i * 151f - scroll * 0.75f, spanY) - (viewH + 40f);
+                bubbles[i].localPosition = new Vector3(x + Mathf.Sin(Time.time * 2.4f + i) * 5f, y, 0f);
+            }
+
+            // Bank decorations scroll with the banks
             float seg = Mathf.Max(44f, (viewH * 2f + 100f) / 16f);
             float decoSpan = 16 * seg;
             for (int idx = 0; idx < bankDecos.Length; idx++)
             {
-                int side = bankDecoSides[idx];
-                int i = bankDecoIndices[idx];
-                float rawY = (i * seg - scroll) % decoSpan;
-                if (rawY < 0f) rawY += decoSpan;
-                float y = rawY - (viewH + 50f);
-                float off = Hash01(i, side, 2) * 28f;
-                float x = side * (rw + 26f + off);
-                bankDecos[idx].localPosition = new Vector3(x, y, 0f);
+                int i = idx % 16;
+                float y = Mathf.Repeat(i * seg - scroll + (idx >= 16 ? seg * 0.5f : 0f), decoSpan) - (viewH + 50f);
+                bankDecos[idx].localPosition = new Vector3(bankDecoX[idx], y, 0f);
             }
 
-            // Update burst particles
-            float dt = Time.deltaTime;
+            UpdatePlayerBubbles(scroll);
+            UpdateParticles(Time.deltaTime);
+        }
+
+        // A little trail of bubbles behind the swimming fish.
+        private void UpdatePlayerBubbles(float scroll)
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.Playing) return;
+            bubbleTimer -= Time.deltaTime;
+            if (bubbleTimer > 0f) return;
+            bubbleTimer = Random.Range(0.22f, 0.4f);
+            Vector2 pos = PlayerPos(new Vector2(Random.Range(-5f, 5f), -26f), new Vector2(0f, -170f));
+            SpawnBurst(pos, new Color(1f, 1f, 1f, 0.75f), 1, 25f, 0.12f, asBubbles: true);
+        }
+
+        private void UpdateParticles(float dt)
+        {
+            float flow = riverController != null ? riverController.FlowSpeed : 150f;
             for (int i = 0; i < particles.Length; i++)
             {
                 if (!particles[i].active) continue;
-                particles[i].life -= dt;
-                if (particles[i].life <= 0f)
+                ref BurstParticle p = ref particles[i];
+                p.life -= dt;
+                if (p.life <= 0f)
                 {
-                    particles[i].active = false;
-                    particles[i].transform.gameObject.SetActive(false);
+                    p.active = false;
+                    p.transform.gameObject.SetActive(false);
                     continue;
                 }
-                Vector3 p = particles[i].transform.position;
-                p.x += particles[i].velocity.x * dt;
-                p.y += particles[i].velocity.y * dt;
-                particles[i].transform.position = p;
+                p.velocity *= 1f - 2.5f * dt; // ease out
+                Vector3 pos = p.transform.position;
+                pos.x += p.velocity.x * dt;
+                pos.y += (p.velocity.y - flow * 0.35f) * dt; // carried a bit by the current
+                p.transform.position = pos;
+                p.transform.Rotate(0f, 0f, p.spin * dt);
 
-                Color c = particles[i].baseColor;
-                c.a = Mathf.Clamp01(particles[i].life / particles[i].maxLife);
-                particles[i].renderer.color = c;
+                float k = p.life / p.maxLife;
+                p.transform.localScale = Vector3.one * p.size * (0.4f + 0.6f * k);
+                Color c = p.baseColor;
+                c.a *= Mathf.Clamp01(k * 1.5f);
+                p.renderer.color = c;
             }
+        }
+
+        private static void SetY(Transform t, float y)
+        {
+            Vector3 p = t.localPosition;
+            p.y = y;
+            t.localPosition = p;
         }
     }
 }

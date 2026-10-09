@@ -106,8 +106,11 @@ namespace Upstream.Mechanics
 
         public void ResetTurbo()
         {
+            bool wasActive = IsTurboActive;
             currentPower = 0f;
             turboTimer = 0f;
+            // Quitting mid-turbo must stop the turbo sound/glow too.
+            if (wasActive) GameEvents.OnTurboEnd?.Invoke();
         }
     }
 }

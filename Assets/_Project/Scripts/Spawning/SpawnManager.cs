@@ -30,6 +30,7 @@ namespace Upstream.Spawning
         private ObjectPool<LogObstacle> logPool;
         private ObjectPool<HookTrap> hookPool;
         private ObjectPool<CoinPickup> coinPool;
+        private ObjectPool<WaveObstacle> wavePool;
 
         private float nextSpawnDistance = 120f;
         private readonly List<EntityBase> activeEntities = new List<EntityBase>(64);
@@ -49,7 +50,8 @@ namespace Upstream.Spawning
             ObjectPool<LogObstacle> logs,
             ObjectPool<HookTrap> hooks,
             DifficultyScaler difficulty = null,
-            ObjectPool<CoinPickup> coins = null)
+            ObjectPool<CoinPickup> coins = null,
+            ObjectPool<WaveObstacle> waves = null)
         {
             spawnConfig = sConfig;
             gameConfig = gConfig;
@@ -64,6 +66,7 @@ namespace Upstream.Spawning
             hookPool = hooks;
             difficultyScaler = difficulty;
             coinPool = coins;
+            wavePool = waves;
         }
 
         private void OnEnable()
@@ -226,6 +229,13 @@ namespace Upstream.Spawning
             float startY = GameCamera.ViewHalfHeight + 40f;
             float side = Random.value < 0.5f ? -1f : 1f;
 
+            // Now and then a wave rolls down the river instead of the usual pattern.
+            if (wavePool != null && Random.value < Mathf.Lerp(0.07f, 0.14f, difficulty))
+            {
+                SpawnWave(rw, startY, side);
+                return;
+            }
+
             FillWeights(difficulty);
             PatternType pattern = PickPattern(Random.value, weightBuffer);
 
@@ -369,6 +379,38 @@ namespace Upstream.Spawning
             }
         }
 
+        /// <summary>
+        /// A wave covering part of the river: from one bank (gap on the other side) or in the middle
+        /// (gaps on both sides). Coins wait in the gap as a reward for dodging it.
+        /// </summary>
+        private void SpawnWave(float rw, float startY, float side)
+        {
+            float baseRadius = gameConfig != null ? gameConfig.playerRadius : 14f;
+            float pRadius = baseRadius * (growthSystem != null ? growthSystem.HitboxMultiplier : 1f);
+            float minGap = pRadius * 2f + 40f; // always passable, even for a huge fish
+
+            var wave = wavePool.Get();
+            float len, centerX, gapX;
+            if (Random.value < 0.35f)
+            {
+                len = Mathf.Min(rw * 2f * Random.Range(0.40f, 0.52f), rw * 2f - minGap * 2f);
+                centerX = 0f;
+                gapX = side * (rw - minGap * 0.5f);
+            }
+            else
+            {
+                len = Mathf.Min(rw * 2f * Random.Range(0.50f, 0.68f), rw * 2f + 10f - minGap);
+                float x0 = side < 0f ? -rw - 10f : rw + 10f - len;
+                centerX = x0 + len * 0.5f;
+                gapX = side < 0f ? rw - minGap * 0.5f : -rw + minGap * 0.5f;
+            }
+            wave.width = len;
+            wave.OnSpawn(new Vector2(centerX, startY));
+            activeEntities.Add(wave);
+
+            SpawnCoinLine(Mathf.Clamp(gapX, -rw + 26f, rw - 26f), startY - 10f, 2, 26f, 0f);
+        }
+
         /// <summary>Vertical line of coins starting at (x, y) going upstream, with an optional sideways wave.</summary>
         private void SpawnCoinLine(float x, float y, int count, float spacing, float wave)
         {
@@ -396,6 +438,7 @@ namespace Upstream.Spawning
                 case EntityType.Log: logPool?.Return((LogObstacle)entity); break;
                 case EntityType.Hook: hookPool?.Return((HookTrap)entity); break;
                 case EntityType.Coin: coinPool?.Return((CoinPickup)entity); break;
+                case EntityType.Wave: wavePool?.Return((WaveObstacle)entity); break;
             }
         }
     }

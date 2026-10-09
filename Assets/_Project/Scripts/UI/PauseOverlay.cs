@@ -5,21 +5,30 @@ using Upstream.Core;
 namespace Upstream.UI
 {
     /// <summary>
-    /// Full-screen "paused, tap to continue" overlay. Shown when the game pauses (app backgrounded,
-    /// Android back button). Resumes on tap release, so the finger doesn't yank the fish on resume.
+    /// Pause menu shown when the game pauses (Android back button, app backgrounded):
+    /// Resume, Settings (wired by the bootstrap) and Main Menu (ends the run; its coins still count).
     /// </summary>
     public class PauseOverlay : MonoBehaviour
     {
+        private Button resumeButton;
+        private Button menuButton;
+
+        public void Configure(Button resume, Button menu)
+        {
+            resumeButton = resume;
+            menuButton = menu;
+            resumeButton.onClick.AddListener(Resume);
+            menuButton.onClick.AddListener(QuitToMenu);
+        }
+
         // Awake/OnDestroy subscriptions: this object is hidden most of the time.
         private void Awake()
         {
-            var tapArea = GetComponent<Button>();
-            if (tapArea != null) tapArea.onClick.AddListener(Resume);
-
             GameEvents.OnGamePause += Show;
             GameEvents.OnGameResume += Hide;
             GameEvents.OnGameStart += Hide;
             GameEvents.OnGameOver += Hide;
+            GameEvents.OnReturnToMenu += Hide;
         }
 
         private void OnDestroy()
@@ -28,6 +37,7 @@ namespace Upstream.UI
             GameEvents.OnGameResume -= Hide;
             GameEvents.OnGameStart -= Hide;
             GameEvents.OnGameOver -= Hide;
+            GameEvents.OnReturnToMenu -= Hide;
         }
 
         private void Show() => gameObject.SetActive(true);
@@ -36,6 +46,11 @@ namespace Upstream.UI
         private void Resume()
         {
             if (GameManager.Instance != null) GameManager.Instance.ResumeGame();
+        }
+
+        private void QuitToMenu()
+        {
+            if (GameManager.Instance != null) GameManager.Instance.QuitRunToMenu();
         }
     }
 }

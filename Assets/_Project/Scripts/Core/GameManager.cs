@@ -98,6 +98,7 @@ namespace Upstream.Core
             {
                 case GameState.Playing: PauseGame(); break;
                 case GameState.Paused: ResumeGame(); break;
+                case GameState.GameOver: ReturnToMenu(); break;
                 case GameState.Menu: Application.Quit(); break;
             }
         }
@@ -179,6 +180,16 @@ namespace Upstream.Core
             yield return new WaitForSecondsRealtime(animDuration);
 
             CurrentState = GameState.GameOver;
+            RecordRunResults();
+            GameEvents.OnGameOver?.Invoke();
+        }
+
+        /// <summary>
+        /// Saves what the run earned: best score, sharks, start-stage unlocks and coins. Used when the
+        /// fish dies and when the player quits a run from the pause menu (nothing earned is lost).
+        /// </summary>
+        private void RecordRunResults()
+        {
             Screen.sleepTimeout = SleepTimeout.SystemSetting;
 
             int score = Config.distanceToMetersDivisor > 0f
@@ -217,8 +228,15 @@ namespace Upstream.Core
             metersPaid = score;
             SaveSystem.Save(save);
             FishShop.RaiseBalanceChanged(save.coins);
+        }
 
-            GameEvents.OnGameOver?.Invoke();
+        /// <summary>Pause menu → Main Menu: ends the run, keeps its coins and best score.</summary>
+        public void QuitRunToMenu()
+        {
+            if (CurrentState != GameState.Paused) return;
+            RecordRunResults();
+            CurrentState = GameState.GameOver; // ReturnToMenu leaves from the end-of-run state
+            ReturnToMenu();
         }
 
         /// <summary>Leaves the game over screen for the main menu (to visit the shop, settings...).</summary>

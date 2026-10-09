@@ -59,11 +59,21 @@ namespace Upstream.River
         // Cheap deterministic hash in [0,1) for star fields.
         private static float Hash(int x, int y) => Frac(Mathf.Sin(x * 127.1f + y * 311.7f) * 43758.547f);
 
+        /// <summary>Cartoon outline: a deep, slightly navy shade of the fish's own color.</summary>
+        private static Color OutlineFor(FishDef f)
+        {
+            Color baseCol = f.pattern == FishPattern.Rainbow ? new Color(0.45f, 0.3f, 0.7f) : f.body;
+            Color c = Color.Lerp(baseCol * 0.38f, new Color(0.08f, 0.10f, 0.25f), 0.35f);
+            c.a = 1f;
+            return c;
+        }
+
         private static Sprite PaintBody(FishDef f)
         {
             const int w = 64, h = 96;
             Texture2D tex = NewTexture(w, h);
             Color eyeBlack = new Color(0.06f, 0.13f, 0.17f, 1f);
+            Color outlineCol = OutlineFor(f);
             Color[] pixels = new Color[w * h];
 
             for (int y = 0; y < h; y++)
@@ -88,13 +98,23 @@ namespace Upstream.River
 
                     c = ApplyPattern(f, c, nx, ny, x, y);
 
-                    // Eyes near the top (+ny)
+                    // Glossy highlight on the upper-left of the back
+                    float shine = Mathf.Clamp01(1f - Vector2.Distance(new Vector2(nx, ny), new Vector2(-0.32f, 0.22f)) / 0.3f);
+                    c = Color.Lerp(c, Color.white, shine * shine * 0.45f);
+
+                    // Big cartoon eyes near the top (+ny) with a white sparkle
                     for (int side = -1; side <= 1; side += 2)
                     {
                         Vector2 p = new Vector2(nx, ny);
-                        if (Vector2.Distance(p, new Vector2(side * 0.58f, 0.60f)) < 0.11f) c = eyeBlack;
-                        else if (Vector2.Distance(p, new Vector2(side * 0.54f, 0.56f)) < 0.19f) c = Color.white;
+                        Vector2 pupil = new Vector2(side * 0.56f, 0.60f);
+                        float eyeWhite = Vector2.Distance(p, new Vector2(side * 0.52f, 0.56f));
+                        if (eyeWhite < 0.25f) c = eyeWhite > 0.21f ? outlineCol : Color.white;
+                        if (Vector2.Distance(p, pupil) < 0.13f) c = eyeBlack;
+                        if (Vector2.Distance(p, pupil + new Vector2(-0.05f, 0.05f)) < 0.05f) c = Color.white;
                     }
+
+                    // Dark outline band along the edge of the body
+                    if (Mathf.Sqrt(d) > 0.9f) c = outlineCol;
 
                     c.a = Mathf.Clamp01((1f - d) * 8f) * f.alpha;
                     pixels[y * w + x] = c;
@@ -214,6 +234,7 @@ namespace Upstream.River
                 float halfSpan = Mathf.Lerp(2f, w * 0.44f, t);
                 float notch = t > 0.72f ? (t - 0.72f) * 28f : 0f;
                 Color col = f.pattern == FishPattern.Rainbow ? Color.HSVToRGB(Frac(0.15f + t * 0.6f), 0.6f, 1f) : f.tail;
+                Color outlineCol = OutlineFor(f);
 
                 for (int x = 0; x < w; x++)
                 {
@@ -223,6 +244,9 @@ namespace Upstream.River
                         // Fin rays: faint darker lines fanning out.
                         float ray = Mathf.Abs(Frac(dx / Mathf.Max(halfSpan, 1f) * 3f) - 0.5f) < 0.08f ? 0.88f : 1f;
                         Color c = col * ray;
+                        float edge = Mathf.Min(halfSpan - dx, y + 0.5f);
+                        if (notch > 0f) edge = Mathf.Min(edge, dx - notch * 0.5f);
+                        if (edge < 1.6f) c = outlineCol;
                         c.a = Mathf.Clamp01((halfSpan - dx) * 1.5f) * f.alpha;
                         pixels[y * w + x] = c;
                     }
@@ -251,7 +275,8 @@ namespace Upstream.River
                     float d = nx * nx + ny * ny;
                     if (d > 1f) { pixels[y * w + x] = Color.clear; continue; }
                     Color c = f.pattern == FishPattern.Rainbow ? Color.HSVToRGB(Frac(0.5f + nx * 0.2f), 0.45f, 1f) : f.fin;
-                    c.a = Mathf.Clamp01((1f - d) * 5f) * 0.92f * f.alpha;
+                    if (Mathf.Sqrt(d) > 0.82f) c = OutlineFor(f);
+                    c.a = Mathf.Clamp01((1f - d) * 5f) * f.alpha;
                     pixels[y * w + x] = c;
                 }
             }

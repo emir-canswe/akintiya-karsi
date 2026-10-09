@@ -11,13 +11,21 @@ namespace Upstream.Entities
 
         public float width = 140f;
         public float height = 22f;
+        private SpriteRenderer[] renderers;
 
         public override void OnSpawn(Vector2 position)
         {
             base.OnSpawn(position);
             if (width <= 0f) width = 140f;
             height = 22f;
-            cachedTransform.localScale = new Vector3(width / 120f, 1f, 1f);
+            // 9-sliced: the cut ends keep their shape at any length (the drop shadow too).
+            cachedTransform.localScale = Vector3.one;
+            if (renderers == null) renderers = GetComponentsInChildren<SpriteRenderer>(true);
+            foreach (var sr in renderers)
+            {
+                sr.drawMode = SpriteDrawMode.Sliced;
+                sr.size = new Vector2(width, 27f);
+            }
         }
     }
 }

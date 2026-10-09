@@ -28,7 +28,22 @@ namespace Upstream.Mechanics
         /// </summary>
         public float GetDifficulty(float distance)
         {
-            return CalculateDifficulty(distance, Config.difficultyRampDistance);
+            float start = Mathf.Clamp01(Config.startingDifficulty);
+            return start + (1f - start) * CalculateDifficulty(distance, Config.difficultyRampDistance);
+        }
+
+        /// <summary>Extra river speed per meter once the main curve has flattened (keeps long runs getting harder).</summary>
+        public const float LateSpeedPerMeter = 0.03f;
+
+        /// <summary>
+        /// River speed for the distance swum: rises quickly at first, eases toward <paramref name="maxSpeed"/>,
+        /// then keeps creeping up so there's never a plateau (capped at 1.35x max).
+        /// </summary>
+        public static float SpeedForDistance(float meters, float startSpeed, float maxSpeed)
+        {
+            meters = Mathf.Max(0f, meters);
+            float curve = (maxSpeed - startSpeed) * (1f - Mathf.Exp(-meters / 800f));
+            return Mathf.Min(startSpeed + curve + meters * LateSpeedPerMeter, maxSpeed * 1.35f);
         }
 
         /// <summary>
@@ -70,14 +85,6 @@ namespace Upstream.Mechanics
             }
 
             return current ?? regions[0];
-        }
-
-        /// <summary>
-        /// Calculates the updated base speed using acceleration.
-        /// </summary>
-        public float GetCurrentSpeed(float baseSpeed, float maxSpeed, float speedIncrease, float deltaTime)
-        {
-            return Mathf.Min(baseSpeed + (speedIncrease * deltaTime), maxSpeed);
         }
     }
 }

@@ -7,7 +7,7 @@ namespace Upstream.Entities
     /// <summary>
     /// Type of the entity for collision and pooling purposes.
     /// </summary>
-    public enum EntityType { Food, GoldFood, Rock, Log, Shark, Hook, Coin }
+    public enum EntityType { Food, GoldFood, Rock, Log, Shark, Hook, Coin, Wave }
 
     /// <summary>
     /// Abstract base class for all river entities that scroll with the flow.

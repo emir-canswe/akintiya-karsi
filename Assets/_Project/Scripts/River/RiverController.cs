@@ -91,14 +91,10 @@ namespace Upstream.River
             GameState state = GameManager.Instance.CurrentState;
             if (state == GameState.Playing)
             {
-                if (scaler != null)
-                {
-                    currentBaseSpeed = scaler.GetCurrentSpeed(currentBaseSpeed, Config.maxSpeed, Config.speedIncrease, Time.deltaTime);
-                }
-                else
-                {
-                    currentBaseSpeed = Mathf.Min(Config.maxSpeed, currentBaseSpeed + Config.speedIncrease * Time.deltaTime);
-                }
+                // Faster the further you swim; eased so a continue or region change never jumps the speed.
+                float meters = Config.distanceToMetersDivisor > 0f ? GameManager.Instance.CurrentDistance / Config.distanceToMetersDivisor : 0f;
+                float target = DifficultyScaler.SpeedForDistance(meters, Config.startSpeed, Config.maxSpeed);
+                currentBaseSpeed = Mathf.MoveTowards(currentBaseSpeed, target, 60f * Time.deltaTime);
             }
 
             float flow = GetFlowSpeed();

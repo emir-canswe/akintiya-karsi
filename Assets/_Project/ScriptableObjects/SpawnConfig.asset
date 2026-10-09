@@ -12,27 +12,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c6a755f92479ea47980903af09d1425, type: 3}
   m_Name: SpawnConfig
   m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.SpawnConfig
-  minSpawnInterval: 150
-  maxSpawnInterval: 230
-  intervalReductionPerDifficulty: 50
+  minSpawnInterval: 140
+  maxSpawnInterval: 215
+  intervalReductionPerDifficulty: 85
   foodPerLineMin: 3
   foodPerLineMax: 6
   goldFoodBaseChance: 0.07
   goldFoodChanceIncrease: 0.05
-  baseSharkSpeed: 70
-  sharkSpeedIncrease: 90
-  sharkTrackingSpeed: 55
+  baseSharkSpeed: 80
+  sharkSpeedIncrease: 120
+  sharkTrackingSpeed: 62
   minLogWidthRatio: 0.42
   maxLogWidthRatio: 0.58
-  logWidthIncreasePerDifficulty: 0.1
+  logWidthIncreasePerDifficulty: 0.16
   diff0FoodLineWeight: 0.3
   diff0RockWeight: 0.2
   diff0LogWeight: 0.16
   diff0SharkWeight: 0.18
   diff0HookWeight: 0.16
-  diff1FoodLineWeight: 0.3
-  diff1RockWeight: 0.2
+  diff1FoodLineWeight: 0.22
+  diff1RockWeight: 0.22
   diff1LogWeight: 0.16
-  diff1SharkWeight: 0.24
-  diff1HookWeight: 0.1
+  diff1SharkWeight: 0.28
+  diff1HookWeight: 0.14
   largeSharksAfterStage: 3

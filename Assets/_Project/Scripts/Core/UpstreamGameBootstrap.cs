@@ -47,8 +47,6 @@ namespace Upstream.Core
         private TMP_Text stageBadgeText;
         private Image stageProgressFill;
         private int shownStage = -1;
-        private AudioManager audioManagerRef;
-        private TMP_Text muteLabel;
 
         private void Awake()
         {
@@ -63,27 +61,17 @@ namespace Upstream.Core
             BuildEntireGame();
 
             LocalizationManager.OnLanguageChanged += HandleLanguageChanged;
-            AudioManager.OnSettingsChanged += RefreshMuteLabel;
         }
 
         private void OnDestroy()
         {
             if (initialized) initialized = false;
             LocalizationManager.OnLanguageChanged -= HandleLanguageChanged;
-            AudioManager.OnSettingsChanged -= RefreshMuteLabel;
         }
 
         private void HandleLanguageChanged()
         {
             shownStage = -1; // force the stage badge to re-render in the new language
-            RefreshMuteLabel();
-        }
-
-        private void RefreshMuteLabel()
-        {
-            if (muteLabel == null) return;
-            bool muted = audioManagerRef != null ? audioManagerRef.IsMuted : !SaveSystem.Load().settingsSoundOn;
-            muteLabel.text = LocalizationManager.Get(muted ? "sound_short_off" : "sound_short_on");
         }
 
         private void Update()
@@ -124,7 +112,7 @@ namespace Upstream.Core
             }
             mainCam.orthographic = true;
             mainCam.orthographicSize = GameCamera.DesignHalfHeight;
-            mainCam.backgroundColor = new Color(0.12f, 0.56f, 0.69f, 1f);
+            mainCam.backgroundColor = new Color(0.42f, 0.80f, 0.29f, 1f); // grass green behind everything
             mainCam.clearFlags = CameraClearFlags.SolidColor;
 
             GameCamera gameCamera = mainCam.GetComponent<GameCamera>();
@@ -197,13 +185,14 @@ namespace Upstream.Core
             Transform poolsRoot = new GameObject("ObjectPools").transform;
             poolsRoot.SetParent(transform, false);
 
-            FoodPickup foodPrefab = CreateEntityTemplate<FoodPickup>("FoodTemplate", templatesRoot, WatercolorSpriteFactory.GetShrimpSprite(), 5);
-            GoldFoodPickup goldPrefab = CreateEntityTemplate<GoldFoodPickup>("GoldFoodTemplate", templatesRoot, WatercolorSpriteFactory.GetGoldFoodSprite(), 6);
-            SharkEnemy sharkPrefab = CreateEntityTemplate<SharkEnemy>("SharkTemplate", templatesRoot, WatercolorSpriteFactory.GetSharkSprite(), 7);
-            RockObstacle rockPrefab = CreateEntityTemplate<RockObstacle>("RockTemplate", templatesRoot, WatercolorSpriteFactory.GetRockSprite(), 4);
-            LogObstacle logPrefab = CreateEntityTemplate<LogObstacle>("LogTemplate", templatesRoot, WatercolorSpriteFactory.GetLogSprite(), 4);
+            FoodPickup foodPrefab = CreateEntityTemplate<FoodPickup>("FoodTemplate", templatesRoot, CartoonSpriteFactory.GetShrimp(), 5);
+            GoldFoodPickup goldPrefab = CreateEntityTemplate<GoldFoodPickup>("GoldFoodTemplate", templatesRoot, CartoonSpriteFactory.GetStar(), 6);
+            SharkEnemy sharkPrefab = CreateEntityTemplate<SharkEnemy>("SharkTemplate", templatesRoot, CartoonSpriteFactory.GetShark(), 7, new Vector2(6f, -9f));
+            RockObstacle rockPrefab = CreateEntityTemplate<RockObstacle>("RockTemplate", templatesRoot, CartoonSpriteFactory.GetRock(), 4, new Vector2(5f, -7f));
+            LogObstacle logPrefab = CreateEntityTemplate<LogObstacle>("LogTemplate", templatesRoot, CartoonSpriteFactory.GetLog(), 4, new Vector2(5f, -7f));
             HookTrap hookPrefab = CreateHookTemplate("HookTemplate", templatesRoot);
             CoinPickup coinPrefab = CreateEntityTemplate<CoinPickup>("CoinTemplate", templatesRoot, WatercolorSpriteFactory.GetCoinSprite(), 6);
+            WaveObstacle wavePrefab = CreateEntityTemplate<WaveObstacle>("WaveTemplate", templatesRoot, CartoonSpriteFactory.GetWave(), 4, castShadow: false);
 
             var foodPool = CreatePool("FoodPool", foodPrefab, 24, poolsRoot);
             var goldPool = CreatePool("GoldFoodPool", goldPrefab, 6, poolsRoot);
@@ -212,6 +201,7 @@ namespace Upstream.Core
             var logPool = CreatePool("LogPool", logPrefab, 8, poolsRoot);
             var hookPool = CreatePool("HookPool", hookPrefab, 8, poolsRoot);
             var coinPool = CreatePool("CoinPool", coinPrefab, 24, poolsRoot);
+            var wavePool = CreatePool("WavePool", wavePrefab, 3, poolsRoot);
 
             // 8. SpawnManager & UI & CollisionManager
             GameObject spawnerObj = new GameObject("SpawnManager");
@@ -229,9 +219,10 @@ namespace Upstream.Core
                 logPool,
                 hookPool,
                 diffScaler,
-                coinPool);
+                coinPool,
+                wavePool);
 
-            ToastUI toastUI = BuildUI(turboSystem, scoreSystem, audioManager, adsManager.Ads);
+            ToastUI toastUI = BuildUI(turboSystem, scoreSystem, adsManager.Ads);
 
             CollisionManager collisionManager = spawnerObj.AddComponent<CollisionManager>();
             collisionManager.Configure(
@@ -248,14 +239,27 @@ namespace Upstream.Core
                 growthConfig);
         }
 
-        private static T CreateEntityTemplate<T>(string name, Transform parent, Sprite sprite, int sortingOrder) where T : EntityBase
+        private static T CreateEntityTemplate<T>(string name, Transform parent, Sprite sprite, int sortingOrder, Vector2? shadowOffset = null, bool castShadow = true) where T : EntityBase
         {
             GameObject go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
             sr.sortingOrder = sortingOrder;
+            if (castShadow) AddDropShadow(go.transform, sprite, shadowOffset ?? new Vector2(3f, -5f));
             return go.AddComponent<T>();
+        }
+
+        /// <summary>Soft silhouette of the same sprite, offset down-right on the water: gives everything depth.</summary>
+        private static void AddDropShadow(Transform owner, Sprite sprite, Vector2 offset)
+        {
+            GameObject shadow = new GameObject("Shadow");
+            shadow.transform.SetParent(owner, false);
+            shadow.transform.localPosition = new Vector3(offset.x, offset.y, 0.1f);
+            var sr = shadow.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.color = new Color(0f, 0.12f, 0.28f, 0.28f); // multiplies to a dark, translucent silhouette
+            sr.sortingOrder = 2;
         }
 
         private static HookTrap CreateHookTemplate(string name, Transform parent)
@@ -263,16 +267,18 @@ namespace Upstream.Core
             GameObject go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = WatercolorSpriteFactory.GetHookSprite();
+            sr.sprite = CartoonSpriteFactory.GetHook();
             sr.sortingOrder = 6;
+            AddDropShadow(go.transform, sr.sprite, new Vector2(3f, -5f));
 
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = true;
-            lr.startWidth = 1.6f;
-            lr.endWidth = 1.6f;
+            lr.startWidth = 1.4f;
+            lr.endWidth = 1.4f;
             lr.material = new Material(Shader.Find("Sprites/Default"));
-            lr.startColor = new Color(1f, 1f, 1f, 0.72f);
-            lr.endColor = new Color(1f, 1f, 1f, 0.72f);
+            // Dark fishing line reads clearly on the bright water.
+            lr.startColor = new Color(0.10f, 0.16f, 0.30f, 0.55f);
+            lr.endColor = new Color(0.10f, 0.16f, 0.30f, 0.75f);
             lr.sortingOrder = 5;
 
             return go.AddComponent<HookTrap>();
@@ -286,7 +292,7 @@ namespace Upstream.Core
             return new ObjectPool<T>(prefab, initialSize, poolObj.transform);
         }
 
-        private ToastUI BuildUI(TurboSystem turboSystem, ScoreSystem scoreSystem, AudioManager audioManager, IAdsService adsService)
+        private ToastUI BuildUI(TurboSystem turboSystem, ScoreSystem scoreSystem, IAdsService adsService)
         {
             if (FindFirstObjectByType<EventSystem>() == null)
             {
@@ -308,7 +314,7 @@ namespace Upstream.Core
             canvasObj.AddComponent<GraphicRaycaster>();
 
             Sprite whiteSpr = WatercolorSpriteFactory.GetWhiteSprite();
-            Sprite heartSpr = WatercolorSpriteFactory.GetHeartSprite();
+            Sprite heartSpr = CartoonSpriteFactory.GetHeart();
 
             // --- SAFE AREA (HUD, menu, buttons stay clear of notches; dim overlays stay full-screen) ---
             GameObject safeObj = CreateUIRect("SafeArea", canvasObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -326,23 +332,25 @@ namespace Upstream.Core
                 GameObject hObj = CreateUIRect($"Heart_{i}", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(22f + i * 26f, -28f), new Vector2(23f, 23f));
                 Image img = hObj.AddComponent<Image>();
                 img.sprite = heartSpr;
-                img.color = new Color(1f, 0.36f, 0.42f, 1f);
+                img.color = new Color(1f, 0.30f, 0.40f, 1f);
                 heartImages[i] = img;
             }
 
             // Distance Text (Top-Center)
             TMP_Text distText = CreateLabel("DistanceText", hudObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -32f), new Vector2(220f, 52f), "0<size=50%>m</size>", 42f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(distText, 0.28f);
 
             // Power Bar (Below Distance)
             GameObject powerBgObj = CreateUIRect("PowerBarBg", hudObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -68f), new Vector2(168f, 13f));
             Image powerBgImg = powerBgObj.AddComponent<Image>();
-            powerBgImg.sprite = whiteSpr;
-            powerBgImg.color = new Color(0f, 0.12f, 0.18f, 0.55f);
+            powerBgImg.sprite = WatercolorSpriteFactory.GetRoundedRectSprite();
+            powerBgImg.type = Image.Type.Sliced;
+            powerBgImg.color = new Color(0.07f, 0.12f, 0.33f, 0.6f);
 
             GameObject powerFillObj = CreateUIRect("PowerBarFill", powerBgObj.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-4f, -4f));
             Image powerFillImg = powerFillObj.AddComponent<Image>();
-            powerFillImg.sprite = whiteSpr;
-            powerFillImg.color = new Color(0.49f, 0.94f, 0.78f, 1f);
+            powerFillImg.sprite = CartoonSpriteFactory.GetBarFill();
+            powerFillImg.color = new Color(0.35f, 1f, 0.62f, 1f);
             powerFillImg.type = Image.Type.Filled;
             powerFillImg.fillMethod = Image.FillMethod.Horizontal;
             powerFillImg.fillAmount = 0f;
@@ -350,36 +358,31 @@ namespace Upstream.Core
             // Growth Stage Indicator (Below Power Bar)
             GameObject stageBgObj = CreateUIRect("StageBarBg", hudObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -88f), new Vector2(148f, 8f));
             Image stageBgImg = stageBgObj.AddComponent<Image>();
-            stageBgImg.sprite = whiteSpr;
-            stageBgImg.color = new Color(0f, 0.12f, 0.18f, 0.40f);
+            stageBgImg.sprite = WatercolorSpriteFactory.GetRoundedRectSprite();
+            stageBgImg.type = Image.Type.Sliced;
+            stageBgImg.color = new Color(0.07f, 0.12f, 0.33f, 0.5f);
 
             GameObject stageFillObj = CreateUIRect("StageBarFill", stageBgObj.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-2f, -2f));
             stageProgressFill = stageFillObj.AddComponent<Image>();
-            stageProgressFill.sprite = whiteSpr;
-            stageProgressFill.color = new Color(1f, 0.84f, 0.35f, 0.9f);
+            stageProgressFill.sprite = CartoonSpriteFactory.GetBarFill();
+            stageProgressFill.color = new Color(1f, 0.82f, 0.25f, 1f);
             stageProgressFill.type = Image.Type.Filled;
             stageProgressFill.fillMethod = Image.FillMethod.Horizontal;
             stageProgressFill.fillAmount = 0f;
 
             stageBadgeText = CreateLabel("StageBadgeText", hudObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(240f, 20f), LocalizationManager.Get("stage_badge_0"), 12f, TextAlignmentOptions.Center, FontStyles.Bold);
-            stageBadgeText.color = new Color(1f, 0.92f, 0.75f, 0.9f);
+            stageBadgeText.color = new Color(1f, 0.95f, 0.6f, 1f);
+            SetOutline(stageBadgeText, 0.3f);
 
-            // Mute Button (Top-Right)
-            GameObject muteObj = CreateUIRect("MuteButton", safeRoot, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-28f, -28f), new Vector2(40f, 40f));
-            Image muteBg = muteObj.AddComponent<Image>();
-            muteBg.sprite = whiteSpr;
-            muteBg.color = new Color(1f, 1f, 1f, 0.18f);
-            Button muteBtn = muteObj.AddComponent<Button>();
-            audioManagerRef = audioManager;
-            muteLabel = CreateLabel("MuteLabel", muteObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 10f, TextAlignmentOptions.Center, FontStyles.Bold);
-            RefreshMuteLabel();
-            // Label updates through AudioManager.OnSettingsChanged (also when changed in Settings).
-            muteBtn.onClick.AddListener(audioManager.ToggleMute);
+            // Pause button (top-right, in-game only: part of the HUD). Sound lives in Settings.
+            Button pauseBtn = CreateRoundIconButton("PauseButton", hudObj.transform, new Vector2(-28f, -28f), CartoonSpriteFactory.GetPauseIcon(), 24f);
+            pauseBtn.onClick.AddListener(() => { if (GameManager.Instance != null) GameManager.Instance.PauseGame(); });
 
             // --- TOAST UI ---
             GameObject toastObj = CreateUIRect("Toast", safeRoot, new Vector2(0.5f, 0.68f), new Vector2(0.5f, 0.68f), Vector2.zero, new Vector2(320f, 54f));
             CanvasGroup toastCg = toastObj.AddComponent<CanvasGroup>();
             TMP_Text toastText = CreateLabel("ToastLabel", toastObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 30f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(toastText, 0.3f);
             ToastUI toastUI = toastObj.AddComponent<ToastUI>();
             // Wire ToastUI fields via reflection so SerializeFields are populated before first Show
             SetPrivateField(toastUI, "label", toastText);
@@ -392,7 +395,8 @@ namespace Upstream.Core
             Image hudCoinImg = hudCoinObj.AddComponent<Image>();
             hudCoinImg.sprite = WatercolorSpriteFactory.GetCoinSprite();
             TMP_Text hudCoinText = CreateLabel("CoinText", hudObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(82f, -56f), new Vector2(100f, 22f), "0", 16f, TextAlignmentOptions.Left, FontStyles.Bold);
-            hudCoinText.color = new Color(1f, 0.84f, 0.35f, 1f);
+            hudCoinText.color = new Color(1f, 0.86f, 0.3f, 1f);
+            SetOutline(hudCoinText, 0.3f);
             hud.SetCoinCounter(hudCoinText);
             hudObj.SetActive(false);
 
@@ -403,24 +407,37 @@ namespace Upstream.Core
             menuDimObj.transform.SetSiblingIndex(safeObj.transform.GetSiblingIndex());
             Image menuDim = menuDimObj.AddComponent<Image>();
             menuDim.sprite = whiteSpr;
-            menuDim.color = new Color(0f, 0.10f, 0.16f, 0.45f);
+            menuDim.color = new Color(0.02f, 0.10f, 0.30f, 0.30f); // light blue veil: the colorful river stays visible
 
             GameObject menuObj = CreateUIRect("MainMenu", safeRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             MainMenuScreen mainMenu = menuObj.AddComponent<MainMenuScreen>();
-            // Keep the sound toggle above the menu so it stays tappable.
-            muteObj.transform.SetAsLastSibling();
 
-            TMP_Text titleText = CreateLabel("Title", menuObj.transform, new Vector2(0.5f, 0.74f), new Vector2(0.5f, 0.74f), Vector2.zero, new Vector2(320f, 120f), "", 48f, TextAlignmentOptions.Center, FontStyles.Bold);
+            // Logo-style title
+            TMP_Text titleText = CreateLabel("Title", menuObj.transform, new Vector2(0.5f, 0.80f), new Vector2(0.5f, 0.80f), Vector2.zero, new Vector2(330f, 140f), "", 58f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(titleText, 0.35f);
             Localize(titleText, "title");
-            TMP_Text howText = CreateLabel("HowTo", menuObj.transform, new Vector2(0.5f, 0.57f), new Vector2(0.5f, 0.57f), Vector2.zero, new Vector2(300f, 80f), "", 15f, TextAlignmentOptions.Center, FontStyles.Normal);
-            Localize(howText, "how_to");
-            howText.color = new Color(0.95f, 0.98f, 1f, 0.85f);
+
+            // Mascot: the equipped fish swimming under the title
+            GameObject mascotSlot = CreateUIRect("Mascot", menuObj.transform, new Vector2(0.5f, 0.605f), new Vector2(0.5f, 0.605f), Vector2.zero, new Vector2(100f, 130f));
+            FishPreview mascot = FishPreview.Create(mascotSlot.transform, Vector2.zero, 128f, true);
+
             Sprite roundSpr = WatercolorSpriteFactory.GetRoundedRectSprite();
-            Button playBtn = CreateTextButton("PlayButton", menuObj.transform, new Vector2(0.5f, 0.42f), Vector2.zero, new Vector2(240f, 64f), "play_btn", roundSpr, new Color(1f, 0.54f, 0.36f, 1f), 28f, new Color(0.17f, 0.05f, 0f, 1f));
-            TMP_Text bestStartText = CreateLabel("BestStart", menuObj.transform, new Vector2(0.5f, 0.22f), new Vector2(0.5f, 0.22f), Vector2.zero, new Vector2(300f, 48f), "", 15f, TextAlignmentOptions.Center, FontStyles.Normal);
-            bestStartText.color = new Color(0.95f, 0.98f, 1f, 0.78f);
+            Button playBtn = CreateTextButton("PlayButton", menuObj.transform, new Vector2(0.5f, 0.42f), Vector2.zero, new Vector2(250f, 72f), "play_btn", roundSpr, new Color(1f, 0.54f, 0.36f, 1f), 32f, new Color(0.17f, 0.05f, 0f, 1f));
+            ShiftLabelRight(playBtn, 34f);
+            AddButtonIcon(playBtn, CartoonSpriteFactory.GetPlayIcon(), new Vector2(-70f, 0f), new Vector2(34f, 34f));
+
+            TMP_Text bestStartText = CreateLabel("BestStart", menuObj.transform, new Vector2(0.5f, 0.20f), new Vector2(0.5f, 0.20f), Vector2.zero, new Vector2(300f, 48f), "", 16f, TextAlignmentOptions.Center, FontStyles.Bold);
+            bestStartText.color = Color.white;
+            SetOutline(bestStartText, 0.28f);
+
+            // Short how-to hint at the bottom
+            TMP_Text howText = CreateLabel("HowTo", menuObj.transform, new Vector2(0.5f, 0.07f), new Vector2(0.5f, 0.07f), Vector2.zero, new Vector2(300f, 44f), "", 12f, TextAlignmentOptions.Center, FontStyles.Normal);
+            Localize(howText, "how_to");
+            howText.color = new Color(1f, 1f, 1f, 0.92f);
+            SetOutline(howText, 0.25f);
 
             mainMenu.Configure(titleText, howText, playBtn, bestStartText, menuDimObj);
+            mainMenu.SetMascot(mascot);
 
             // Coin balance (top-left)
             GameObject balanceObj = CreateUIRect("CoinBalance", menuObj.transform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(64f, -28f), new Vector2(108f, 34f));
@@ -441,77 +458,96 @@ namespace Upstream.Core
             GameObject overObj = CreateUIRect("GameOver", canvasObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image overDim = overObj.AddComponent<Image>();
             overDim.sprite = whiteSpr;
-            overDim.color = new Color(0f, 0.10f, 0.16f, 0.48f);
+            overDim.color = new Color(0.02f, 0.08f, 0.25f, 0.55f);
             CanvasGroup overCg = overObj.AddComponent<CanvasGroup>();
 
-            GameObject cardObj = CreateUIRect("Card", overObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(310f, 410f));
+            // Card: GameOverScreen shrinks it when the continue button isn't offered.
+            GameObject cardObj = CreateUIRect("Card", overObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(300f, 340f));
             Image cardBg = cardObj.AddComponent<Image>();
             cardBg.sprite = roundSpr;
             cardBg.type = Image.Type.Sliced;
-            cardBg.color = new Color(0.03f, 0.16f, 0.23f, 0.92f);
+            cardBg.color = PanelColor;
+            AddPanelBorder(cardBg);
 
-            TMP_Text overHeader = CreateLabel("OverHeader", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -34f), new Vector2(260f, 28f), "", 16f, TextAlignmentOptions.Center, FontStyles.Bold);
+            // Ribbon title straddling the card's top edge
+            GameObject ribbon = CreateUIRect("Ribbon", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 2f), new Vector2(236f, 50f));
+            Image ribbonImg = ribbon.AddComponent<Image>();
+            ribbonImg.sprite = roundSpr;
+            ribbonImg.type = Image.Type.Sliced;
+            ribbonImg.color = new Color(1f, 0.54f, 0.36f, 1f);
+            AddCandyShadow(ribbonImg);
+            TMP_Text overHeader = CreateLabel("OverHeader", ribbon.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 21f, TextAlignmentOptions.Center, FontStyles.Bold);
+            overHeader.color = Color.white;
+            SetOutline(overHeader, 0.3f);
             Localize(overHeader, "game_over_title");
-            overHeader.color = new Color(0.95f, 0.98f, 1f, 0.76f);
 
-            TMP_Text finalScoreText = CreateLabel("FinalScore", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -90f), new Vector2(260f, 74f), "0<size=45%>m</size>", 62f, TextAlignmentOptions.Center, FontStyles.Bold);
+            // Distance
+            TMP_Text distLabel = CreateLabel("DistanceLabel", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(240f, 20f), "", 13f, TextAlignmentOptions.Center, FontStyles.Bold);
+            distLabel.color = new Color(0.78f, 0.9f, 1f, 1f);
+            Localize(distLabel, "distance_label");
+            TMP_Text finalScoreText = CreateLabel("FinalScore", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(260f, 70f), "0<size=45%>m</size>", 64f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(finalScoreText, 0.25f);
 
-            GameObject badgeObj = CreateUIRect("NewBestBadge", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -142f), new Vector2(130f, 26f));
+            // "You now start as YOUNG!" (only shown when a run unlocks a bigger starting fish)
+            TMP_Text unlockNote = CreateLabel("UnlockNote", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -134f), new Vector2(280f, 22f), "", 13f, TextAlignmentOptions.Center, FontStyles.Bold);
+            unlockNote.color = new Color(1f, 0.88f, 0.35f, 1f);
+            SetOutline(unlockNote, 0.25f);
+
+            // Stat pills: best score (star) | coins earned (coin)
+            TMP_Text bestText = CreateStatPill("BestPill", cardObj.transform, new Vector2(-72f, -174f), CartoonSpriteFactory.GetStar());
+            TMP_Text coinsEarned = CreateStatPill("CoinsPill", cardObj.transform, new Vector2(72f, -174f), WatercolorSpriteFactory.GetCoinSprite());
+            coinsEarned.color = new Color(1f, 0.88f, 0.35f, 1f);
+
+            // "NEW BEST!" sticker hanging off the card's top-right corner
+            GameObject badgeObj = CreateUIRect("NewBestBadge", cardObj.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -58f), new Vector2(108f, 32f));
+            badgeObj.transform.localRotation = Quaternion.Euler(0f, 0f, -12f);
             Image badgeBg = badgeObj.AddComponent<Image>();
             badgeBg.sprite = roundSpr;
             badgeBg.type = Image.Type.Sliced;
-            badgeBg.color = new Color(1f, 0.54f, 0.36f, 1f);
-            TMP_Text badgeLbl = CreateLabel("BadgeLabel", badgeObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 13f, TextAlignmentOptions.Center, FontStyles.Bold);
-            badgeLbl.color = new Color(0.17f, 0.05f, 0f, 1f);
+            badgeBg.color = new Color(1f, 0.84f, 0.22f, 1f);
+            AddCandyShadow(badgeBg);
+            TMP_Text badgeLbl = CreateLabel("BadgeLabel", badgeObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 14f, TextAlignmentOptions.Center, FontStyles.Bold);
+            badgeLbl.color = new Color(0.40f, 0.16f, 0f, 1f);
             Localize(badgeLbl, "new_best");
 
-            TMP_Text bestText = CreateLabel("BestScore", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -174f), new Vector2(240f, 26f), "", 15f, TextAlignmentOptions.Center, FontStyles.Normal);
+            // Continue with a rewarded ad (hidden when not offered)
+            Button contBtn = CreateTextButton("ContinueBtn", cardObj.transform, new Vector2(0.5f, 0f), new Vector2(0f, 106f), new Vector2(264f, 46f), null, roundSpr, new Color(0.62f, 0.45f, 1f, 1f), 15f, Color.white);
+            TMP_Text contLabel = contBtn.GetComponentInChildren<TMP_Text>();
+            SetOutline(contLabel, 0.25f);
+            ShiftLabelRight(contBtn, 26f);
+            AddButtonIcon(contBtn, CartoonSpriteFactory.GetPlayIcon(), new Vector2(-108f, 0f), new Vector2(22f, 22f));
 
-            // "You now start as YOUNG!" (only shown when a run unlocks a bigger starting fish)
-            TMP_Text unlockNote = CreateLabel("UnlockNote", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -200f), new Vector2(280f, 24f), "", 12f, TextAlignmentOptions.Center, FontStyles.Bold);
-            unlockNote.color = new Color(1f, 0.84f, 0.35f, 1f);
-
-            // "+42 coins" earned this run
-            GameObject earnedIcon = CreateUIRect("CoinsIcon", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-62f, -232f), new Vector2(22f, 22f));
-            earnedIcon.AddComponent<Image>().sprite = WatercolorSpriteFactory.GetCoinSprite();
-            TMP_Text coinsEarned = CreateLabel("CoinsEarned", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(14f, -232f), new Vector2(140f, 28f), "", 20f, TextAlignmentOptions.Left, FontStyles.Bold);
-            coinsEarned.color = new Color(1f, 0.84f, 0.35f, 1f);
-
-            // Play Again Button
-            GameObject againBtnObj = CreateUIRect("PlayAgainBtn", cardObj.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 148f), new Vector2(266f, 48f));
-            Image againBg = againBtnObj.AddComponent<Image>();
-            againBg.sprite = roundSpr;
-            againBg.type = Image.Type.Sliced;
-            againBg.color = new Color(1f, 0.54f, 0.36f, 1f);
-            Button againBtn = againBtnObj.AddComponent<Button>();
-            TMP_Text againLbl = CreateLabel("AgainLabel", againBtnObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 18f, TextAlignmentOptions.Center, FontStyles.Bold);
-            againLbl.color = new Color(0.17f, 0.05f, 0f, 1f);
-            Localize(againLbl, "play_again");
-
-            // Continue Button
-            GameObject contBtnObj = CreateUIRect("ContinueBtn", cardObj.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 94f), new Vector2(266f, 44f));
-            Image contBg = contBtnObj.AddComponent<Image>();
-            contBg.sprite = roundSpr;
-            contBg.type = Image.Type.Sliced;
-            contBg.color = new Color(1f, 1f, 1f, 0.15f);
-            Button contBtn = contBtnObj.AddComponent<Button>();
-            TMP_Text contLabel = CreateLabel("ContLabel", contBtnObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 16f, TextAlignmentOptions.Center, FontStyles.Bold);
+            // Bottom row: round home button + big Play Again
+            Button menuBtn = CreateTextButton("MenuBtn", cardObj.transform, new Vector2(0.5f, 0f), new Vector2(-102f, 44f), new Vector2(60f, 56f), null, roundSpr, new Color(1f, 1f, 1f, 0.22f), 12f, Color.white);
+            AddButtonIcon(menuBtn, CartoonSpriteFactory.GetHomeIcon(), Vector2.zero, new Vector2(34f, 34f));
+            Button againBtn = CreateTextButton("PlayAgainBtn", cardObj.transform, new Vector2(0.5f, 0f), new Vector2(34f, 44f), new Vector2(196f, 56f), "play_again", roundSpr, new Color(1f, 0.54f, 0.36f, 1f), 19f, new Color(0.17f, 0.05f, 0f, 1f));
+            ShiftLabelRight(againBtn, 26f);
+            AddButtonIcon(againBtn, CartoonSpriteFactory.GetPlayIcon(), new Vector2(-70f, 0f), new Vector2(24f, 24f));
 
             GameOverScreen gameOverScreen = overObj.AddComponent<GameOverScreen>();
             gameOverScreen.Configure(finalScoreText, bestText, badgeObj, againBtn, contBtn, contLabel, unlockNote, overCg, scoreSystem, adsService);
-            Button menuBtn = CreateTextButton("MenuBtn", cardObj.transform, new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(266f, 40f), "menu_btn", roundSpr, new Color(1f, 1f, 1f, 0.08f), 15f, new Color(1f, 1f, 1f, 0.85f));
             gameOverScreen.SetCoinsAndMenu(coinsEarned, menuBtn);
+            gameOverScreen.SetCard((RectTransform)cardObj.transform, 340f, 288f);
             overObj.SetActive(false);
 
             // --- PAUSE OVERLAY (app backgrounded / back button) ---
             GameObject pauseObj = CreateUIRect("PauseOverlay", canvasObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image pauseDim = pauseObj.AddComponent<Image>();
             pauseDim.sprite = whiteSpr;
-            pauseDim.color = new Color(0f, 0.10f, 0.16f, 0.55f);
-            pauseObj.AddComponent<Button>().transition = Selectable.Transition.None;
-            TMP_Text pauseLabel = CreateLabel("PauseLabel", pauseObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 120f), "", 34f, TextAlignmentOptions.Center, FontStyles.Bold);
+            pauseDim.color = new Color(0.02f, 0.08f, 0.25f, 0.6f);
+            // The dim swallows taps: only the card's buttons do anything.
+            GameObject pauseCard = CreateUIRect("Card", pauseObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280f, 292f));
+            Image pauseCardBg = pauseCard.AddComponent<Image>();
+            pauseCardBg.sprite = roundSpr;
+            pauseCardBg.type = Image.Type.Sliced;
+            pauseCardBg.color = PanelColor;
+            AddPanelBorder(pauseCardBg);
+            TMP_Text pauseLabel = CreateLabel("PauseLabel", pauseCard.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -42f), new Vector2(250f, 40f), "", 26f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(pauseLabel, 0.3f);
             Localize(pauseLabel, "paused");
-            pauseObj.AddComponent<PauseOverlay>();
+            Button resumeBtn = CreateTextButton("ResumeBtn", pauseCard.transform, new Vector2(0.5f, 1f), new Vector2(0f, -108f), new Vector2(230f, 56f), "resume_btn", roundSpr, new Color(0.36f, 0.86f, 0.45f, 1f), 22f, new Color(0.04f, 0.22f, 0.08f, 1f));
+            Button pauseMenuBtn = CreateTextButton("PauseMenuBtn", pauseCard.transform, new Vector2(0.5f, 1f), new Vector2(0f, -240f), new Vector2(230f, 46f), "menu_btn", roundSpr, new Color(1f, 1f, 1f, 0.18f), 17f, Color.white);
+            pauseObj.AddComponent<PauseOverlay>().Configure(resumeBtn, pauseMenuBtn);
 
             // --- FISH SHOP (full screen, opened from the menu) ---
             FishShopScreen shop = BuildShopPanel(canvasObj.transform, whiteSpr);
@@ -519,19 +555,17 @@ namespace Upstream.Core
             // --- SETTINGS PANEL (on top of everything; opened from menu and pause) ---
             SettingsScreen settings = BuildSettingsPanel(canvasObj.transform, whiteSpr);
 
-            // Menu buttons under Play: FISH (shop) and SETTINGS. Children of the menu: they hide with it.
-            Button shopBtn = CreateTextButton("ShopButton", menuObj.transform, new Vector2(0.5f, 0.42f), new Vector2(-62f, -76f), new Vector2(116f, 50f), "shop_btn", roundSpr, new Color(1f, 0.80f, 0.30f, 1f), 15f, new Color(0.17f, 0.05f, 0f, 1f));
-            ShiftLabelRight(shopBtn, 22f);
-            AddButtonIcon(shopBtn, FishSkinFactory.GetBody(FishCatalog.Get(FishCatalog.StarterId)), new Vector2(-38f, 0f), new Vector2(14f, 21f));
+            // Menu: big FISH (shop) button under Play; round settings gear top-right. Children of the menu: they hide with it.
+            Button shopBtn = CreateTextButton("ShopButton", menuObj.transform, new Vector2(0.5f, 0.42f), new Vector2(0f, -90f), new Vector2(250f, 56f), "shop_btn", roundSpr, new Color(1f, 0.80f, 0.30f, 1f), 21f, new Color(0.17f, 0.05f, 0f, 1f));
+            ShiftLabelRight(shopBtn, 30f);
+            AddButtonIcon(shopBtn, FishSkinFactory.GetBody(FishCatalog.Get(FishCatalog.StarterId)), new Vector2(-72f, 0f), new Vector2(20f, 30f));
             shopBtn.onClick.AddListener(shop.Open);
 
-            Button menuSettingsBtn = CreateTextButton("SettingsButton", menuObj.transform, new Vector2(0.5f, 0.42f), new Vector2(62f, -76f), new Vector2(116f, 50f), "settings_title", roundSpr, new Color(1f, 1f, 1f, 0.16f), 15f, Color.white);
-            ShiftLabelRight(menuSettingsBtn, 22f);
-            AddButtonIcon(menuSettingsBtn, WatercolorSpriteFactory.GetGearSprite(), new Vector2(-38f, 0f), new Vector2(18f, 18f));
+            Button menuSettingsBtn = CreateRoundIconButton("SettingsButton", menuObj.transform, new Vector2(-28f, -28f), WatercolorSpriteFactory.GetGearSprite(), 26f);
             menuSettingsBtn.onClick.AddListener(settings.Open);
 
-            Button pauseSettingsBtn = CreateTextButton("SettingsButton", pauseObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -110f), new Vector2(200f, 46f), "settings_title", roundSpr, new Color(1f, 1f, 1f, 0.18f), 16f, Color.white);
-            AddButtonIcon(pauseSettingsBtn, WatercolorSpriteFactory.GetGearSprite(), new Vector2(-62f, 0f), new Vector2(20f, 20f));
+            Button pauseSettingsBtn = CreateTextButton("SettingsButton", pauseCard.transform, new Vector2(0.5f, 1f), new Vector2(0f, -178f), new Vector2(230f, 46f), "settings_title", roundSpr, new Color(1f, 1f, 1f, 0.18f), 17f, Color.white);
+            AddButtonIcon(pauseSettingsBtn, WatercolorSpriteFactory.GetGearSprite(), new Vector2(-70f, 0f), new Vector2(20f, 20f));
             pauseSettingsBtn.onClick.AddListener(settings.Open);
 
             pauseObj.SetActive(false);
@@ -546,13 +580,14 @@ namespace Upstream.Core
             GameObject root = CreateUIRect("Settings", canvasRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image dim = root.AddComponent<Image>();
             dim.sprite = whiteSpr;
-            dim.color = new Color(0f, 0.06f, 0.10f, 0.72f); // also swallows taps meant for screens below
+            dim.color = new Color(0.02f, 0.08f, 0.25f, 0.6f); // also swallows taps meant for screens below
 
             GameObject card = CreateUIRect("Card", root.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 330f));
             Image cardBg = card.AddComponent<Image>();
             cardBg.sprite = roundSpr;
             cardBg.type = Image.Type.Sliced;
-            cardBg.color = new Color(0.04f, 0.18f, 0.26f, 0.97f);
+            cardBg.color = PanelColor;
+            AddPanelBorder(cardBg);
 
             TMP_Text title = CreateLabel("Title", card.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(260f, 34f), "", 22f, TextAlignmentOptions.Center, FontStyles.Bold);
             Localize(title, "settings_title");
@@ -587,6 +622,87 @@ namespace Upstream.Core
             return screen;
         }
 
+        private static readonly Color PanelColor = new Color(0.17f, 0.32f, 0.78f, 1f);
+
+        /// <summary>"Candy" 3D look: a darker copy of the shape just below it.</summary>
+        private static void AddCandyShadow(Image img)
+        {
+            var shadow = img.gameObject.AddComponent<Shadow>();
+            Color c = img.color;
+            shadow.effectColor = c.a > 0.5f ? new Color(c.r * 0.6f, c.g * 0.55f, c.b * 0.6f, 1f) : new Color(0.02f, 0.06f, 0.2f, 0.35f);
+            shadow.effectDistance = new Vector2(0f, -4f);
+        }
+
+        /// <summary>Cartoon panel: thick light border plus a drop shadow.</summary>
+        private static void AddPanelBorder(Image img)
+        {
+            var border = img.gameObject.AddComponent<Outline>();
+            border.effectColor = new Color(0.75f, 0.88f, 1f, 1f);
+            border.effectDistance = new Vector2(3f, -3f);
+            var shadow = img.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0.02f, 0.06f, 0.2f, 0.45f);
+            shadow.effectDistance = new Vector2(0f, -8f);
+        }
+
+        private static readonly System.Collections.Generic.Dictionary<float, Material> OutlineMaterials =
+            new System.Collections.Generic.Dictionary<float, Material>();
+
+        /// <summary>
+        /// Dark navy text outline: keeps white text readable on the bright water. Built from TMP's own
+        /// "Outline" material so the shader's OUTLINE_ON variant ships in the Android build (a keyword set
+        /// at runtime on the default material would be stripped and render without an outline).
+        /// </summary>
+        private static void SetOutline(TMP_Text label, float width)
+        {
+            if (!OutlineMaterials.TryGetValue(width, out Material mat) || mat == null)
+            {
+                Material source = Resources.Load<Material>("Fonts & Materials/LiberationSans SDF - Outline");
+                if (source == null) return;
+                mat = new Material(source) { name = $"Outline {width}" };
+                mat.SetFloat(ShaderUtilities.ID_OutlineWidth, width);
+                mat.SetColor(ShaderUtilities.ID_OutlineColor, new Color32(18, 30, 84, 255));
+                mat.SetFloat(ShaderUtilities.ID_FaceDilate, width * 0.5f); // keep letters as thick as without outline
+                OutlineMaterials[width] = mat;
+            }
+            label.fontSharedMaterial = mat;
+        }
+
+        /// <summary>Rounded pill with an icon on the left and an auto-sized label (game over stats).</summary>
+        private static TMP_Text CreateStatPill(string name, Transform parent, Vector2 pos, Sprite icon)
+        {
+            GameObject pill = CreateUIRect(name, parent, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), pos, new Vector2(134f, 40f));
+            Image bg = pill.AddComponent<Image>();
+            bg.sprite = WatercolorSpriteFactory.GetRoundedRectSprite();
+            bg.type = Image.Type.Sliced;
+            bg.color = new Color(0.05f, 0.12f, 0.40f, 0.55f);
+            bg.raycastTarget = false;
+            GameObject iconObj = CreateUIRect("Icon", pill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(20f, 0f), new Vector2(26f, 26f));
+            Image img = iconObj.AddComponent<Image>();
+            img.sprite = icon;
+            img.raycastTarget = false;
+            TMP_Text label = CreateLabel("Label", pill.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(84f, 0f), new Vector2(92f, 30f), "", 15f, TextAlignmentOptions.Left, FontStyles.Bold);
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 9f;
+            label.fontSizeMax = 15f;
+            return label;
+        }
+
+        /// <summary>Round blue candy button with a white icon, anchored to the parent's top-right corner.</summary>
+        private static Button CreateRoundIconButton(string name, Transform parent, Vector2 anchoredPos, Sprite icon, float iconSize)
+        {
+            GameObject go = CreateUIRect(name, parent, new Vector2(1f, 1f), new Vector2(1f, 1f), anchoredPos, new Vector2(44f, 44f));
+            Image bg = go.AddComponent<Image>();
+            bg.sprite = WatercolorSpriteFactory.GetCircleSprite();
+            bg.color = new Color(0.17f, 0.32f, 0.78f, 0.92f);
+            AddCandyShadow(bg);
+            Button btn = go.AddComponent<Button>();
+            GameObject iconObj = CreateUIRect("Icon", go.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(iconSize, iconSize));
+            Image img = iconObj.AddComponent<Image>();
+            img.sprite = icon;
+            img.raycastTarget = false;
+            return btn;
+        }
+
         /// <summary>Moves a button's label right to make room for an icon on its left.</summary>
         private static void ShiftLabelRight(Button button, float amount)
         {
@@ -598,54 +714,102 @@ namespace Upstream.Core
         {
             Sprite roundSpr = WatercolorSpriteFactory.GetRoundedRectSprite();
             Sprite coinSpr = WatercolorSpriteFactory.GetCoinSprite();
-            Color cardColor = new Color(0.05f, 0.20f, 0.29f, 1f);
-            Color gold = new Color(1f, 0.84f, 0.35f, 1f);
+            Color gold = new Color(1f, 0.86f, 0.3f, 1f);
 
+            // Underwater backdrop: deep blue with drifting sunlight (scrolled by FishShopScreen)
             GameObject root = CreateUIRect("FishShop", canvasRoot, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Image bg = root.AddComponent<Image>();
             bg.sprite = whiteSpr;
-            bg.color = new Color(0.02f, 0.11f, 0.17f, 0.97f); // opaque enough to read; swallows taps
+            bg.color = new Color(0.10f, 0.24f, 0.62f, 1f); // swallows taps meant for the menu below
+            GameObject lightObj = CreateUIRect("Sunlight", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            RawImage sunlight = lightObj.AddComponent<RawImage>();
+            sunlight.texture = CartoonSpriteFactory.GetCaustics().texture;
+            sunlight.color = new Color(1f, 1f, 1f, 0.10f);
+            sunlight.raycastTarget = false;
 
             GameObject content = CreateUIRect("Content", root.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             content.AddComponent<SafeAreaFitter>();
             Transform c = content.transform;
 
-            // Header: title (left) + coin balance (right)
-            TMP_Text title = CreateLabel("Title", c, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(116f, -30f), new Vector2(200f, 30f), "", 20f, TextAlignmentOptions.Left, FontStyles.Bold);
-            Localize(title, "shop_title");
+            // Header: round close (left) + coin balance (right)
+            GameObject closeObj = CreateUIRect("ShopClose", c, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -28f), new Vector2(44f, 44f));
+            Image closeBg = closeObj.AddComponent<Image>();
+            closeBg.sprite = WatercolorSpriteFactory.GetCircleSprite();
+            closeBg.color = new Color(1f, 0.42f, 0.45f, 1f);
+            AddCandyShadow(closeBg);
+            Button close = closeObj.AddComponent<Button>();
+            GameObject closeIcon = CreateUIRect("Icon", closeObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24f, 24f));
+            Image closeIconImg = closeIcon.AddComponent<Image>();
+            closeIconImg.sprite = CartoonSpriteFactory.GetCloseIcon();
+            closeIconImg.raycastTarget = false;
 
-            GameObject balanceObj = CreateUIRect("Balance", c, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-62f, -30f), new Vector2(104f, 32f));
+            GameObject balanceObj = CreateUIRect("Balance", c, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-60f, -28f), new Vector2(104f, 36f));
             Image balanceBg = balanceObj.AddComponent<Image>();
             balanceBg.sprite = roundSpr;
             balanceBg.type = Image.Type.Sliced;
-            balanceBg.color = new Color(0f, 0f, 0f, 0.3f);
-            GameObject balanceIcon = CreateUIRect("Icon", balanceObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(20f, 20f));
+            balanceBg.color = new Color(0.04f, 0.10f, 0.35f, 0.7f);
+            GameObject balanceIcon = CreateUIRect("Icon", balanceObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(19f, 0f), new Vector2(24f, 24f));
             balanceIcon.AddComponent<Image>().sprite = coinSpr;
-            TMP_Text balanceText = CreateLabel("Amount", balanceObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(64f, 0f), new Vector2(68f, 26f), "0", 16f, TextAlignmentOptions.Left, FontStyles.Bold);
+            TMP_Text balanceText = CreateLabel("Amount", balanceObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(64f, 0f), new Vector2(68f, 28f), "0", 17f, TextAlignmentOptions.Left, FontStyles.Bold);
             balanceText.color = gold;
+            SetOutline(balanceText, 0.25f);
 
-            // Detail card: big animated preview on the left, info + action on the right
-            GameObject detail = CreateUIRect("Detail", c, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -150f), new Vector2(308f, 170f));
+            // Display card: the selected fish swims in its own little aquarium
+            GameObject detail = CreateUIRect("Detail", c, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -190f), new Vector2(304f, 236f));
             Image detailBg = detail.AddComponent<Image>();
             detailBg.sprite = roundSpr;
             detailBg.type = Image.Type.Sliced;
-            detailBg.color = cardColor;
+            detailBg.color = PanelColor;
+            AddPanelBorder(detailBg);
 
-            FishPreview bigPreview = FishPreview.Create(detail.transform, new Vector2(-82f, 0f), 150f, true);
-            TMP_Text nameText = CreateLabel("Name", detail.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(62f, 50f), new Vector2(172f, 28f), "", 18f, TextAlignmentOptions.Center, FontStyles.Bold);
+            GameObject ribbon = CreateUIRect("Ribbon", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 4f), new Vector2(200f, 40f));
+            Image ribbonImg = ribbon.AddComponent<Image>();
+            ribbonImg.sprite = roundSpr;
+            ribbonImg.type = Image.Type.Sliced;
+            ribbonImg.color = new Color(1f, 0.54f, 0.36f, 1f);
+            AddCandyShadow(ribbonImg);
+            TMP_Text title = CreateLabel("Title", ribbon.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 17f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(title, 0.3f);
+            Localize(title, "shop_title");
+
+            GameObject stageObj = CreateUIRect("Aquarium", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -78f), new Vector2(272f, 104f));
+            Image stageImg = stageObj.AddComponent<Image>();
+            stageImg.sprite = roundSpr;
+            stageImg.type = Image.Type.Sliced;
+            stageImg.color = new Color(0.45f, 0.82f, 1f, 0.35f);
+            stageImg.raycastTarget = false;
+            GameObject glowObj = CreateUIRect("Glow", stageObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(170f, 120f));
+            Image previewGlow = glowObj.AddComponent<Image>();
+            previewGlow.sprite = WatercolorSpriteFactory.GetCircleGlowSprite();
+            previewGlow.raycastTarget = false;
+            FishPreview bigPreview = FishPreview.Create(stageObj.transform, Vector2.zero, 110f, true);
+            bigPreview.transform.localRotation = Quaternion.Euler(0f, 0f, -90f); // swims sideways across the tank
+
+            TMP_Text nameText = CreateLabel("Name", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-40f, -148f), new Vector2(190f, 28f), "", 19f, TextAlignmentOptions.Left, FontStyles.Bold);
             nameText.enableAutoSizing = true;
             nameText.fontSizeMin = 12f;
-            nameText.fontSizeMax = 18f;
-            TMP_Text rarityText = CreateLabel("Rarity", detail.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(62f, 26f), new Vector2(172f, 20f), "", 13f, TextAlignmentOptions.Center, FontStyles.Bold);
-            TMP_Text perkText = CreateLabel("Perk", detail.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(62f, -4f), new Vector2(172f, 36f), "", 13f, TextAlignmentOptions.Center, FontStyles.Normal);
-            perkText.color = new Color(1f, 1f, 1f, 0.82f);
-            Button action = CreateTextButton("ShopAction", detail.transform, new Vector2(0.5f, 0.5f), new Vector2(62f, -54f), new Vector2(172f, 44f), null, roundSpr, Color.white, 15f, Color.white);
+            nameText.fontSizeMax = 19f;
+            SetOutline(nameText, 0.25f);
+
+            GameObject rarityObj = CreateUIRect("RarityPill", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(98f, -148f), new Vector2(92f, 24f));
+            Image rarityPill = rarityObj.AddComponent<Image>();
+            rarityPill.sprite = roundSpr;
+            rarityPill.type = Image.Type.Sliced;
+            rarityPill.raycastTarget = false;
+            TMP_Text rarityText = CreateLabel("Rarity", rarityObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 12f, TextAlignmentOptions.Center, FontStyles.Bold);
+            rarityText.color = Color.white;
+            SetOutline(rarityText, 0.25f);
+
+            TMP_Text perkText = CreateLabel("Perk", detail.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-40f, -178f), new Vector2(190f, 30f), "", 13f, TextAlignmentOptions.Left, FontStyles.Bold);
+            perkText.color = new Color(0.75f, 1f, 0.8f, 1f);
+
+            Button action = CreateTextButton("ShopAction", detail.transform, new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(272f, 46f), null, roundSpr, Color.white, 17f, Color.white);
 
             // Scrollable grid of all fish
             GameObject scrollObj = CreateUIRect("Grid", c, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             RectTransform scrollRt = (RectTransform)scrollObj.transform;
-            scrollRt.offsetMin = new Vector2(8f, 74f);
-            scrollRt.offsetMax = new Vector2(-8f, -246f);
+            scrollRt.offsetMin = new Vector2(8f, 8f);
+            scrollRt.offsetMax = new Vector2(-8f, -318f);
             scrollObj.AddComponent<RectMask2D>();
             Image scrollHit = scrollObj.AddComponent<Image>(); // lets drags between cards scroll too
             scrollHit.color = Color.clear;
@@ -658,9 +822,9 @@ namespace Upstream.Core
             gridRt.pivot = new Vector2(0.5f, 1f);
             gridRt.sizeDelta = Vector2.zero;
             GridLayoutGroup grid = gridObj.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(96f, 124f);
-            grid.spacing = new Vector2(8f, 8f);
-            grid.padding = new RectOffset(0, 0, 4, 12);
+            grid.cellSize = new Vector2(96f, 128f);
+            grid.spacing = new Vector2(8f, 10f);
+            grid.padding = new RectOffset(0, 0, 6, 16);
             grid.childAlignment = TextAnchor.UpperCenter;
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 3;
@@ -678,42 +842,53 @@ namespace Upstream.Core
             for (int i = 0; i < FishCatalog.Count; i++)
             {
                 FishDef fish = FishCatalog.All[i];
+                Color rarity = FishCatalog.RarityColor(fish.rarity);
+
                 GameObject cardObj = new GameObject($"Fish_{fish.id}", typeof(RectTransform));
                 cardObj.transform.SetParent(gridObj.transform, false);
                 Image frame = cardObj.AddComponent<Image>();
                 frame.sprite = roundSpr;
                 frame.type = Image.Type.Sliced;
                 frame.pixelsPerUnitMultiplier = 2f; // 12-unit corners
+                AddCandyShadow(frame);
                 Button btn = cardObj.AddComponent<Button>();
 
-                GameObject inner = CreateUIRect("Inner", cardObj.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-6f, -6f));
+                // Inner panel tinted toward the rarity color
+                GameObject inner = CreateUIRect("Inner", cardObj.transform, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-8f, -8f));
                 Image innerImg = inner.AddComponent<Image>();
                 innerImg.sprite = roundSpr;
                 innerImg.type = Image.Type.Sliced;
                 innerImg.pixelsPerUnitMultiplier = 2.4f;
-                innerImg.color = cardColor;
+                innerImg.color = Color.Lerp(new Color(0.12f, 0.24f, 0.62f, 1f), rarity, 0.28f);
                 innerImg.raycastTarget = false;
 
-                TMP_Text cardName = CreateLabel("Name", inner.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -11f), new Vector2(84f, 16f), "", 10f, TextAlignmentOptions.Center, FontStyles.Bold);
+                TMP_Text cardName = CreateLabel("Name", inner.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -11f), new Vector2(82f, 16f), "", 10f, TextAlignmentOptions.Center, FontStyles.Bold);
                 cardName.enableAutoSizing = true;
                 cardName.fontSizeMin = 7f;
                 cardName.fontSizeMax = 10f;
-                FishPreview preview = FishPreview.Create(inner.transform, new Vector2(0f, 1f), 72f, false);
+                SetOutline(cardName, 0.25f);
+                FishPreview preview = FishPreview.Create(inner.transform, new Vector2(0f, 2f), 70f, false);
                 preview.SetFish(fish);
 
-                GameObject coinIcon = CreateUIRect("Coin", inner.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-24f, 13f), new Vector2(14f, 14f));
+                // Price tag / status chip at the bottom
+                GameObject chipObj = CreateUIRect("Chip", inner.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 15f), new Vector2(78f, 22f));
+                Image chip = chipObj.AddComponent<Image>();
+                chip.sprite = roundSpr;
+                chip.type = Image.Type.Sliced;
+                chip.raycastTarget = false;
+                GameObject coinIcon = CreateUIRect("Coin", chipObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(11f, 0f), new Vector2(15f, 15f));
                 Image coinImg = coinIcon.AddComponent<Image>();
                 coinImg.sprite = coinSpr;
                 coinImg.raycastTarget = false;
-                TMP_Text price = CreateLabel("Price", inner.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(6f, 13f), new Vector2(76f, 18f), "", 13f, TextAlignmentOptions.Center, FontStyles.Bold);
+                TMP_Text price = CreateLabel("Price", chipObj.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 12f, TextAlignmentOptions.Center, FontStyles.Bold);
+                SetOutline(price, 0.25f);
 
-                cards[i] = new FishShopScreen.Card { fish = fish, button = btn, frame = frame, preview = preview, priceText = price, coinIcon = coinIcon, nameText = cardName };
+                cards[i] = new FishShopScreen.Card { fish = fish, button = btn, frame = frame, preview = preview, priceText = price, coinIcon = coinIcon, nameText = cardName, chip = chip };
             }
-
-            Button close = CreateTextButton("ShopClose", c, new Vector2(0.5f, 0f), new Vector2(0f, 38f), new Vector2(308f, 48f), "close_btn", roundSpr, new Color(1f, 0.54f, 0.36f, 1f), 18f, new Color(0.17f, 0.05f, 0f, 1f));
 
             FishShopScreen screen = root.AddComponent<FishShopScreen>();
             screen.Configure(bigPreview, nameText, rarityText, perkText, action, balanceText, cards, close);
+            screen.SetDecor(rarityPill, previewGlow, sunlight);
             root.SetActive(false);
             return screen;
         }
@@ -726,7 +901,7 @@ namespace Upstream.Core
             bg.sprite = roundSpr;
             bg.type = Image.Type.Sliced;
             bg.pixelsPerUnitMultiplier = 1.6f; // softer 15-unit corners for the smaller rows
-            bg.color = new Color(1f, 1f, 1f, 0.08f);
+            bg.color = new Color(1f, 1f, 1f, 0.14f);
             Button btn = row.AddComponent<Button>();
             if (!tappable) btn.transition = Selectable.Transition.None;
 
@@ -769,6 +944,7 @@ namespace Upstream.Core
             bg.sprite = sprite;
             if (sprite != null && sprite.border != Vector4.zero) bg.type = Image.Type.Sliced;
             bg.color = bgColor;
+            if (bgColor.a > 0.05f) AddCandyShadow(bg);
             Button btn = go.AddComponent<Button>();
             TMP_Text label = CreateLabel("Label", go.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", fontSize, TextAlignmentOptions.Center, FontStyles.Bold);
             label.color = textColor;

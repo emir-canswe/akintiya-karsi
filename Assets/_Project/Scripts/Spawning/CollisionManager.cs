@@ -208,6 +208,26 @@ namespace Upstream.Spawning
                         }
                         break;
 
+                    case EntityType.Wave:
+                        var wave = (WaveObstacle)entity;
+                        if (wave.spent) break;
+                        float halfW = wave.width * 0.5f;
+                        float wx = Mathf.Clamp(playerPos.x, ePos.x - halfW, ePos.x + halfW);
+                        float wy = Mathf.Clamp(playerPos.y, ePos.y - WaveObstacle.Height * 0.5f, ePos.y + WaveObstacle.Height * 0.5f);
+                        if (Vector2.Distance(playerPos, new Vector2(wx, wy)) < pRadius)
+                        {
+                            wave.Spend();
+                            if (!isTurbo)
+                            {
+                                // Not damage: the wave pushes back and the river slows for a moment.
+                                riverController?.ApplySlowdown(1.6f);
+                                gameCamera?.Shake(4f);
+                                GameEvents.OnWaveHit?.Invoke();
+                                toastUI?.Show(LocalizationManager.Get("wave_toast"), new Color(0.55f, 0.85f, 1f));
+                            }
+                        }
+                        break;
+
                     case EntityType.Hook:
                         var hook = (HookTrap)entity;
                         Vector2 hookPos = new Vector2(hook.CurrentX, ePos.y);

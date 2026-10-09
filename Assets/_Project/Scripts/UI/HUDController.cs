@@ -66,6 +66,7 @@ namespace Upstream.UI
             GameEvents.OnGameOver += HandleGameOver;
             GameEvents.OnContinueUsed += HandleContinueUsed;
             GameEvents.OnRunCoinsChanged += HandleRunCoinsChanged;
+            GameEvents.OnReturnToMenu += HandleGameOver;
         }
 
         private void OnDestroy()
@@ -80,6 +81,7 @@ namespace Upstream.UI
             GameEvents.OnGameOver -= HandleGameOver;
             GameEvents.OnContinueUsed -= HandleContinueUsed;
             GameEvents.OnRunCoinsChanged -= HandleRunCoinsChanged;
+            GameEvents.OnReturnToMenu -= HandleGameOver;
         }
 
         private void HandleRunCoinsChanged(int coins)

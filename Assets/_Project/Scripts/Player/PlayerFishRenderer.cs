@@ -23,6 +23,7 @@ namespace Upstream.Player
         private SpriteRenderer leftFinRenderer;
         private SpriteRenderer rightFinRenderer;
         private SpriteRenderer auraRenderer;
+        private SpriteRenderer shadowRenderer;
 
         private float wagClock;
         private float currentVisualScale = 1f;
@@ -66,6 +67,8 @@ namespace Upstream.Player
             rightFinRenderer.sprite = FishSkinFactory.GetFin(fish);
 
             bodyRenderer.transform.localScale = new Vector3(fish.width, fish.length, 1f);
+            shadowRenderer.sprite = bodyRenderer.sprite;
+            shadowRenderer.transform.localScale = bodyRenderer.transform.localScale;
             tailRenderer.transform.localPosition = new Vector3(0f, -18f * fish.length, 0f);
             tailRenderer.transform.localScale = Vector3.one * fish.tailSize;
             leftFinRenderer.transform.localPosition = new Vector3(-13f * fish.width, 2f, 0f);
@@ -102,13 +105,20 @@ namespace Upstream.Player
             auraRenderer.sortingOrder = 8;
             auraRenderer.color = Color.clear;
 
+            // Soft drop shadow on the water (sprites are assigned by ApplySkin)
+            GameObject shadowObj = new GameObject("Shadow");
+            shadowObj.transform.SetParent(visualRoot, false);
+            shadowObj.transform.localPosition = new Vector3(6f, -9f, 0.1f);
+            shadowRenderer = shadowObj.AddComponent<SpriteRenderer>();
+            shadowRenderer.color = new Color(0f, 0.12f, 0.28f, 0.28f);
+            shadowRenderer.sortingOrder = 3;
+
             // Pectoral fins
             GameObject lFinObj = new GameObject("LeftFin");
             lFinObj.transform.SetParent(visualRoot, false);
             lFinObj.transform.localPosition = new Vector3(-13f, 2f, 0f);
             lFinObj.transform.localRotation = Quaternion.Euler(0f, 0f, 32f);
             leftFinRenderer = lFinObj.AddComponent<SpriteRenderer>();
-            leftFinRenderer.sprite = WatercolorSpriteFactory.GetFishFinSprite();
             leftFinRenderer.sortingOrder = 9;
 
             GameObject rFinObj = new GameObject("RightFin");
@@ -116,7 +126,6 @@ namespace Upstream.Player
             rFinObj.transform.localPosition = new Vector3(13f, 2f, 0f);
             rFinObj.transform.localRotation = Quaternion.Euler(0f, 0f, -32f);
             rightFinRenderer = rFinObj.AddComponent<SpriteRenderer>();
-            rightFinRenderer.sprite = WatercolorSpriteFactory.GetFishFinSprite();
             rightFinRenderer.sortingOrder = 9;
 
             // Tail fin
@@ -124,14 +133,12 @@ namespace Upstream.Player
             tailObj.transform.SetParent(visualRoot, false);
             tailObj.transform.localPosition = new Vector3(0f, -18f, 0f);
             tailRenderer = tailObj.AddComponent<SpriteRenderer>();
-            tailRenderer.sprite = WatercolorSpriteFactory.GetFishTailSprite();
             tailRenderer.sortingOrder = 9;
 
             // Main body
             GameObject bodyObj = new GameObject("Body");
             bodyObj.transform.SetParent(visualRoot, false);
             bodyRenderer = bodyObj.AddComponent<SpriteRenderer>();
-            bodyRenderer.sprite = WatercolorSpriteFactory.GetFishBodySprite();
             bodyRenderer.sortingOrder = 10;
         }
 
@@ -213,6 +220,7 @@ namespace Upstream.Player
             tailRenderer.enabled = !blinkHide;
             leftFinRenderer.enabled = !blinkHide;
             rightFinRenderer.enabled = !blinkHide;
+            shadowRenderer.enabled = !blinkHide;
         }
     }
 }

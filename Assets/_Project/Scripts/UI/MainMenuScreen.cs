@@ -17,6 +17,19 @@ namespace Upstream.UI
         [SerializeField] private TMP_Text bestScoreText;
         [SerializeField] private GameObject backdrop;
         private TMP_Text coinBalanceText;
+        private FishPreview mascot;
+
+        /// <summary>The equipped fish, swimming under the title; follows shop changes.</summary>
+        public void SetMascot(FishPreview preview)
+        {
+            mascot = preview;
+            if (mascot != null) mascot.SetFish(FishShop.Equipped);
+        }
+
+        private void HandleFishEquipped(Data.FishDef fish)
+        {
+            if (mascot != null) mascot.SetFish(fish);
+        }
 
         /// <summary>Coin balance shown on the menu (top-left).</summary>
         public void SetCoinBalance(TMP_Text label)
@@ -30,12 +43,14 @@ namespace Upstream.UI
         {
             GameEvents.OnReturnToMenu += HandleReturnToMenu;
             FishShop.OnBalanceChanged += UpdateCoins;
+            FishShop.OnFishEquipped += HandleFishEquipped;
         }
 
         private void OnDestroy()
         {
             GameEvents.OnReturnToMenu -= HandleReturnToMenu;
             FishShop.OnBalanceChanged -= UpdateCoins;
+            FishShop.OnFishEquipped -= HandleFishEquipped;
         }
 
         private void HandleReturnToMenu()
@@ -90,6 +105,24 @@ namespace Upstream.UI
         {
             if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.Menu)
             {
+                if (titleText != null)
+                {
+                    // Title gently floats and wobbles like it's bobbing on the water.
+                    float t = Time.unscaledTime;
+                    titleText.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(t * 1.3f) * 2.5f);
+                    float ts = 1f + 0.025f * Mathf.Sin(t * 2.1f);
+                    titleText.rectTransform.localScale = new Vector3(ts, ts, 1f);
+                }
+
+                if (mascot != null)
+                {
+                    // Mascot bobs and drifts a little, like it's swimming in place.
+                    float mt = Time.unscaledTime;
+                    var rt = (RectTransform)mascot.transform;
+                    rt.anchoredPosition = new Vector2(Mathf.Sin(mt * 0.9f) * 10f, Mathf.Sin(mt * 1.7f) * 5f);
+                    rt.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(mt * 0.9f + 1.2f) * 8f);
+                }
+
                 if (playButton != null)
                 {
                     // Gentle "breathing" pulse so the Play button draws the eye.
