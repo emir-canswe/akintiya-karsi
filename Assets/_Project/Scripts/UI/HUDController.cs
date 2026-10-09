@@ -31,7 +31,7 @@ namespace Upstream.UI
         private const float GhostHold = 0.35f;
         private const float GhostDrainPerSecond = 0.7f;
         private const float HealFillPerSecond = 0.6f;
-        private const float LowHealth = 0.3f;
+        private const float LowHealth = 0.5f; // one more hit ends the run
         private static readonly Color HealthColor = new Color(1f, 0.36f, 0.42f, 1f);
         private static readonly Color LowHealthColor = new Color(1f, 0.16f, 0.2f, 1f);
         private float healthTarget = 1f;
@@ -182,7 +182,7 @@ namespace Upstream.UI
         private void ApplyHealthBar()
         {
             bool low = healthTarget > 0f && healthTarget <= LowHealth;
-            // Low health: the bar and heart throb so the danger is obvious at a glance.
+            // Low health: the bar and heart throb so "one more hit and you're out" is obvious at a glance.
             float beat = low ? 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 9f) : 0f;
             if (healthFill != null)
             {

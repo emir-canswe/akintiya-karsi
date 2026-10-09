@@ -23,7 +23,7 @@ MonoBehaviour:
   continueInvincibility: 2.2
   goldFoodHeal: 10
   stageUpHeal: 10
-  legendaryBonusHP: 25
+  legendaryBonusHP: 15
   powerPerFood: 12
   maxPower: 100
   riverHalfWidth: 150

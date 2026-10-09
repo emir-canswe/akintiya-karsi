@@ -106,7 +106,7 @@ namespace Upstream.Core
             { "ability_rockbreaker", new Entry("Kaya kıran: kayalar zarar vermez", "Rock breaker: rocks can't hurt you") },
             { "ability_slim", new Entry("İnce: %{0} küçük vuruş alanı", "Slim: {0}% smaller hitbox") },
             { "perk_coin", new Entry("+%{0} para", "+{0}% coins") },
-            { "perk_heart", new Entry("+25 can", "+25 health") },
+            { "perk_heart", new Entry("+15 can", "+15 health") },
             { "perk_none", new Entry("Başlangıç balığı", "Starter fish") },
             { "next_fish_goal", new Entry("{0} için {1} para daha!", "{1} more coins for {0}!") },
             { "can_buy_fish", new Entry("{0} alabilirsin!", "You can buy {0}!") },

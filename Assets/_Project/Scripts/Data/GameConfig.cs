@@ -22,7 +22,7 @@ namespace Upstream.Data
         /// <summary>Health given back on reaching a new growth stage (stages with healOnStageUp).</summary>
         public int stageUpHeal = 10;
         /// <summary>Extra max health from a legendary fish (FishDef.extraHeart).</summary>
-        public int legendaryBonusHP = 25;
+        public int legendaryBonusHP = 15;
 
         [Header("Power")]
         public float powerPerFood = 12f;

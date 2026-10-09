@@ -69,6 +69,11 @@ namespace Upstream.Tests
             Assert.Less(HitDamage.ForPredator(PredatorKind.Shark, false), HitDamage.ForPredator(PredatorKind.Shark, true));
             Assert.Less(HitDamage.ForRock(true), HitDamage.ForRock(false));
             Assert.AreEqual(HitDamage.Catfish, HitDamage.ForPredator(PredatorKind.Catfish, true));
+            // Even the weakest hit, twice, empties a legendary fish's bar plus one small heal.
+            var cfg = health.Config;
+            Assert.GreaterOrEqual(HitDamage.Min * 2, cfg.maxHP + cfg.legendaryBonusHP);
+            Assert.GreaterOrEqual(HitDamage.Min * 2, cfg.maxHP + cfg.goldFoodHeal);
+            Assert.Less(HitDamage.Catfish, cfg.maxHP, "No single hit kills from full health.");
 
             Assert.IsTrue(health.TakeDamage(HitDamage.Piranha));
             Assert.AreEqual(100 - HitDamage.Piranha, health.CurrentHP);
@@ -100,7 +105,7 @@ namespace Upstream.Tests
                 hits++;
             }
             Assert.AreEqual(0, health.CurrentHP);
-            Assert.AreEqual(Mathf.CeilToInt((float)health.MaxHP / HitDamage.Shark), hits);
+            Assert.AreEqual(2, hits, "A second hit always ends the run.");
             Assert.IsFalse(health.TakeDamage(HitDamage.Shark), "No more hits once the bar is empty.");
 
             Object.DestroyImmediate(go);
