@@ -736,43 +736,78 @@ namespace Upstream.Core
             return label;
         }
 
-        /// <summary>Bottom-of-menu "how to play" strip: icon + one or two words per tip.</summary>
+        /// <summary>
+        /// "How to play" card near the bottom of the menu: a titled, see-through card with the four steps in order
+        /// (arrows between them) that light up one by one. Deliberately unlike a tab bar: lifted off the bottom
+        /// edge, lighter than the buttons, a heading on top and nothing that looks pressable.
+        /// </summary>
         private static void BuildTipsPanel(Transform menu, Sprite roundSpr)
         {
-            GameObject panel = CreateUIRect("Tips", menu, new Vector2(0.5f, 0.075f), new Vector2(0.5f, 0.075f), Vector2.zero, new Vector2(304f, 70f));
+            GameObject panel = CreateUIRect("Tips", menu, new Vector2(0.5f, 0.085f), new Vector2(0.5f, 0.085f), Vector2.zero, new Vector2(292f, 74f));
             Image bg = panel.AddComponent<Image>();
             bg.sprite = roundSpr;
             bg.type = Image.Type.Sliced;
-            bg.color = new Color(0.07f, 0.16f, 0.45f, 0.72f);
+            bg.color = new Color(1f, 1f, 1f, 0.16f); // frosted glass over the river, like the in-game coin pill
             bg.raycastTarget = false;
             var border = panel.AddComponent<Outline>();
-            border.effectColor = new Color(1f, 1f, 1f, 0.35f);
-            border.effectDistance = new Vector2(2f, -2f);
+            border.effectColor = new Color(1f, 1f, 1f, 0.45f);
+            border.effectDistance = new Vector2(1.5f, -1.5f);
+
+            // Heading tab sitting on the card's top edge
+            GameObject header = CreateUIRect("TipsHeader", panel.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 1f), new Vector2(136f, 22f));
+            Image headerBg = header.AddComponent<Image>();
+            headerBg.sprite = roundSpr;
+            headerBg.type = Image.Type.Sliced;
+            headerBg.pixelsPerUnitMultiplier = 2.4f; // pill
+            headerBg.color = new Color(0.07f, 0.16f, 0.45f, 0.92f);
+            headerBg.raycastTarget = false;
+            TMP_Text headerText = CreateLabel("TipsHeaderText", header.transform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, "", 12f, TextAlignmentOptions.Center, FontStyles.Bold);
+            headerText.color = new Color(1f, 0.88f, 0.4f, 1f);
+            headerText.characterSpacing = 4f;
+            Localize(headerText, "tips_title");
 
             (Sprite icon, Vector2 size, string key)[] tips =
             {
-                (CartoonSpriteFactory.GetDragIcon(), new Vector2(30f, 30f), "tip_drag"),
-                (CartoonSpriteFactory.GetShrimp(), new Vector2(34f, 34f), "tip_eat"),
-                (CartoonSpriteFactory.GetPredatorBody(PredatorKind.Shark), new Vector2(26f, 34f), "tip_shark"),
-                (WatercolorSpriteFactory.GetCoinSprite(), new Vector2(26f, 26f), "tip_coins"),
+                (CartoonSpriteFactory.GetDragIcon(), new Vector2(28f, 28f), "tip_drag"),
+                (CartoonSpriteFactory.GetShrimp(), new Vector2(30f, 30f), "tip_eat"),
+                (CartoonSpriteFactory.GetPredatorBody(PredatorKind.Shark), new Vector2(23f, 30f), "tip_shark"),
+                (WatercolorSpriteFactory.GetCoinSprite(), new Vector2(24f, 24f), "tip_coins"),
             };
-            const float colW = 76f;
+            const float colW = 70f;
+            var icons = new RectTransform[tips.Length];
+            var labels = new TMP_Text[tips.Length];
+            Sprite arrow = CartoonSpriteFactory.GetPlayIcon();
             for (int i = 0; i < tips.Length; i++)
             {
                 float x = (i - (tips.Length - 1) * 0.5f) * colW;
-                GameObject iconObj = CreateUIRect($"TipIcon_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 11f), tips[i].size);
+                GameObject iconObj = CreateUIRect($"TipIcon_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 9f), tips[i].size);
                 Image img = iconObj.AddComponent<Image>();
                 img.sprite = tips[i].icon;
                 img.preserveAspect = true;
                 img.raycastTarget = false;
+                icons[i] = (RectTransform)iconObj.transform;
 
-                TMP_Text label = CreateLabel($"TipLabel_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -20f), new Vector2(colW - 4f, 18f), "", 11f, TextAlignmentOptions.Center, FontStyles.Bold);
+                TMP_Text label = CreateLabel($"TipLabel_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -21f), new Vector2(colW - 6f, 18f), "", 11f, TextAlignmentOptions.Center, FontStyles.Bold);
                 label.enableAutoSizing = true;
                 label.fontSizeMin = 8f;
                 label.fontSizeMax = 11f;
                 SetOutline(label, 0.25f);
                 Localize(label, tips[i].key);
+                labels[i] = label;
+
+                // Small arrow to the next step: "do this, then this"
+                if (i < tips.Length - 1)
+                {
+                    GameObject arrowObj = CreateUIRect($"TipArrow_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x + colW * 0.5f, 9f), new Vector2(8f, 8f));
+                    Image arrowImg = arrowObj.AddComponent<Image>();
+                    arrowImg.sprite = arrow;
+                    arrowImg.preserveAspect = true;
+                    arrowImg.color = new Color(1f, 1f, 1f, 0.55f);
+                    arrowImg.raycastTarget = false;
+                }
             }
+
+            panel.AddComponent<TipsAnimator>().Configure(icons, labels);
         }
 
         /// <summary>Round blue candy button with a white icon, anchored to the parent's top-right corner.</summary>

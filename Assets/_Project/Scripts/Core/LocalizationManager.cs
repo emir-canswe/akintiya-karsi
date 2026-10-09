@@ -30,6 +30,7 @@ namespace Upstream.Core
         {
             // Menu
             { "title", new Entry("AKINTIYA\n<color=#FF8A5C>KARŞI</color>", "SWIM\n<color=#FF8A5C>UPSTREAM</color>") },
+            { "tips_title", new Entry("NASIL OYNANIR?", "HOW TO PLAY") },
             { "tip_drag", new Entry("Sürükle", "Drag") },
             { "tip_eat", new Entry("Ye ve büyü", "Eat & grow") },
             { "tip_shark", new Entry("Köpekbalığı yut", "Eat sharks") },
