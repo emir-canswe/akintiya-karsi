@@ -76,7 +76,12 @@ namespace Upstream.Player
         private void Update()
         {
             if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.Playing)
+            {
+                // A finger held through pause/game over must not count as a drag when play resumes.
+                activeTouchId = NoTouch;
+                mouseDragging = false;
                 return;
+            }
 
             if (mainCamera == null) mainCamera = UnityEngine.Camera.main;
 
@@ -84,19 +89,58 @@ namespace Upstream.Player
             MovePlayer();
         }
 
+        private const int NoTouch = -1;
+        private int activeTouchId = NoTouch;
+        private float lastPointerX;
+        private bool mouseDragging;
+
+        /// <summary>
+        /// Relative steering: the fish moves by how far the finger slides sideways (times the sensitivity
+        /// gain), wherever the finger is on the screen. Touching down never makes the fish jump, the thumb
+        /// never has to cover the fish, and a small slide is enough to cross the river.
+        /// </summary>
         private void HandleInput()
         {
-            if (Touch.activeTouches.Count > 0 && mainCamera != null)
+            float worldPerPixel = mainCamera != null && Screen.height > 0
+                ? mainCamera.orthographicSize * 2f / Screen.height
+                : 0f;
+            float gain = ControlSettings.Gain;
+
+            var touches = Touch.activeTouches;
+            if (touches.Count > 0)
             {
-                Vector2 screenPos = Touch.activeTouches[0].screenPosition;
-                Vector3 worldPos = mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
-                targetX = worldPos.x;
+                // Follow the finger that started the drag; if it lifts, carry on with another one.
+                int index = -1;
+                for (int i = 0; i < touches.Count; i++)
+                {
+                    if (touches[i].touchId == activeTouchId) { index = i; break; }
+                }
+                if (index < 0)
+                {
+                    activeTouchId = touches[0].touchId;
+                    lastPointerX = touches[0].screenPosition.x;
+                }
+                else
+                {
+                    float x = touches[index].screenPosition.x;
+                    targetX += (x - lastPointerX) * worldPerPixel * gain;
+                    lastPointerX = x;
+                }
             }
-            else if (Mouse.current != null && Mouse.current.leftButton.isPressed && mainCamera != null)
+            else
             {
-                Vector2 screenPos = Mouse.current.position.ReadValue();
-                Vector3 worldPos = mainCamera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, 10f));
-                targetX = worldPos.x;
+                activeTouchId = NoTouch;
+                if (Mouse.current != null && Mouse.current.leftButton.isPressed)
+                {
+                    float x = Mouse.current.position.ReadValue().x;
+                    if (mouseDragging) targetX += (x - lastPointerX) * worldPerPixel * gain;
+                    lastPointerX = x;
+                    mouseDragging = true;
+                }
+                else
+                {
+                    mouseDragging = false;
+                }
             }
 
             if (Keyboard.current != null)
@@ -125,7 +169,8 @@ namespace Upstream.Player
             float previousX = transform.position.x;
 
             float steering = Config.playerMoveSmoothing * FishShop.Active.SteeringMultiplier;
-            float newX = Mathf.Lerp(previousX, targetX, Mathf.Min(1f, steering * Time.deltaTime));
+            // Exponential follow: the same feel at 60 or 90 fps (a plain per-frame lerp is snappier at high fps).
+            float newX = Mathf.Lerp(previousX, targetX, 1f - Mathf.Exp(-steering * Time.deltaTime));
             newX = Mathf.Clamp(newX, -limit, limit);
 
             transform.position = new Vector3(newX, DefaultPlayerY, 0f);

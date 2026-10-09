@@ -81,6 +81,10 @@ namespace Upstream.Core
             { "sound_label", new Entry("Ses", "Sound") },
             { "vib_label", new Entry("Titreşim", "Vibration") },
             { "lang_label", new Entry("Dil", "Language") },
+            { "sens_label", new Entry("Hassasiyet", "Sensitivity") },
+            { "sens_low", new Entry("Az", "Low") },
+            { "sens_mid", new Entry("Orta", "Mid") },
+            { "sens_high", new Entry("Çok", "High") },
             { "close_btn", new Entry("Kapat", "Close") },
 
             // Coins & fish shop

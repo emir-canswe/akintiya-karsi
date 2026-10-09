@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.GameConfig
   startSpeed: 140
   maxSpeed: 420
-  playerMoveSmoothing: 12
+  playerMoveSmoothing: 22
   turboSpeedMultiplier: 1.7
   turboTime: 3.2
   maxHP: 100

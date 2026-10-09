@@ -212,19 +212,30 @@ namespace Upstream.Audio
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
-                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (var currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
-                using (var vibrator = currentActivity.Call<AndroidJavaObject>("getSystemService", "vibrator"))
+                // Looked up once: creating the Java objects on every buzz allocated garbage mid-run.
+                if (androidVibrator == null)
                 {
-                    vibrator.Call("vibrate", (long)milliseconds);
+                    using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                    using (var currentActivity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
+                    {
+                        androidVibrator = currentActivity.Call<AndroidJavaObject>("getSystemService", "vibrator");
+                    }
                 }
+                androidVibrator.Call("vibrate", (long)milliseconds);
             }
             catch (System.Exception)
             {
                 Handheld.Vibrate();
             }
+#elif UNITY_IOS && !UNITY_EDITOR
+            // iOS has no duration control: one short system buzz.
+            Handheld.Vibrate();
 #endif
         }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        private static AndroidJavaObject androidVibrator;
+#endif
 
         // Bright "ding": the gold-food chime pitched up, slightly varied so a coin trail sounds lively.
         private void HandleCoinCollected(int amount) => PlaySFXPitchVaried(eatGoldFood, 1.75f, 1.95f);

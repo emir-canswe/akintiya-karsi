@@ -24,11 +24,8 @@ namespace Upstream.EditorTools
         private const string IconBackgroundPath = IconFolder + "/AppIcon_Background.png";
         private const string IconForegroundPath = IconFolder + "/AppIcon_Foreground.png";
 
-        // Brand colors (same as the game: river teal + koi orange)
-        private static readonly Color WaterTop = new Color(0.13f, 0.62f, 0.75f);
+        // Splash screen background: deep river teal (icon colors are further down, with the icon art).
         private static readonly Color WaterBottom = new Color(0.04f, 0.33f, 0.45f);
-        private static readonly Color FishColor = new Color(1f, 0.54f, 0.36f);
-        private static readonly Color FishBelly = new Color(1f, 0.82f, 0.72f);
 
         [MenuItem("Upstream/5. Apply Release Settings (version, icon, splash)", priority = 40)]
         public static void Apply()
@@ -52,6 +49,25 @@ namespace Upstream.EditorTools
         {
             GenerateIcons();
             ApplyIcons();
+            WriteStoreIcon();
+        }
+
+        /// <summary>Command line: regenerate the icons and the 512 px Play Store icon, then quit.</summary>
+        public static void RegenerateIconsCli()
+        {
+            RegenerateIcons();
+            AssetDatabase.SaveAssets();
+            EditorApplication.Exit(0);
+        }
+
+        /// <summary>Google Play's "App icon": 512 x 512, 32-bit PNG, full square (Play rounds the corners).</summary>
+        public const string StoreIconPath = "docs/store/play-icon-512.png";
+
+        private static void WriteStoreIcon()
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(StoreIconPath));
+            WritePng(StoreIconPath, 512, StoreIcon);
+            Debug.Log($"[Upstream] Play Store icon written to {StoreIconPath}");
         }
 
         /// <summary>
@@ -112,11 +128,11 @@ namespace Upstream.EditorTools
             Directory.CreateDirectory(IconFolder);
             const int size = 1024;
 
-            // Legacy / store icon: water + fish, full bleed (launchers apply their own mask).
-            WritePng(IconPath, size, (u, v) => Over(Water(u, v), Fish(u, v, 0.78f)));
-            // Adaptive icon layers: Android may crop to the central ~66%, so the fish is drawn smaller.
-            WritePng(IconBackgroundPath, size, Water);
-            WritePng(IconForegroundPath, size, (u, v) => Fish(u, v, 0.56f));
+            // Legacy / iOS / store icon: Blue on the warm background, full bleed (stores apply their own mask).
+            WritePng(IconPath, size, StoreIcon);
+            // Adaptive icon layers: Android may crop to the central ~66%, so Blue is drawn smaller.
+            WritePng(IconBackgroundPath, size, Background);
+            WritePng(IconForegroundPath, size, (u, v) => BlueFish(u, v, 0.6f));
 
             AssetDatabase.Refresh();
             foreach (string path in new[] { IconPath, IconBackgroundPath, IconForegroundPath })
@@ -183,67 +199,164 @@ namespace Upstream.EditorTools
             UnityEngine.Object.DestroyImmediate(tex);
         }
 
-        // u, v in 0..1, v = 0 at the bottom.
-        private static Color Water(float u, float v)
+        // ---------------------------------------------------------------- icon art
+        // u, v in 0..1, v = 0 at the bottom. Blue (the hero) on a warm sunny background: almost every fish
+        // and water game on the store is blue, so a blue fish on orange stands out in a grid of icons.
+
+        private static readonly Color Navy = H("#163C8C");
+        private static readonly Color SunCenter = H("#FFD84D");
+        private static readonly Color SunEdge = H("#FF8A3D");
+        private static readonly Color BlueDark = H("#2C7FD6");
+        private static readonly Color BlueLight = H("#66B9FF");
+        private static readonly Color BlueSpot = H("#1B4F9C");
+        private static readonly Color FinColor = H("#CDEBFF");
+        private static readonly Color TailColor = H("#FF6B5E");
+        private static readonly Color TailDark = H("#E0474A");
+        private static readonly Color Pupil = H("#14182B");
+
+        /// <summary>Head direction: tilted toward the upper right, swimming "up" the icon.</summary>
+        private const float FishAngle = 32f * Mathf.Deg2Rad;
+
+        private static Color H(string hex)
         {
-            Color c = Color.Lerp(WaterBottom, WaterTop, v);
-            // soft light ripples drifting downstream
-            float ripple = Mathf.Sin((v * 9f + Mathf.Sin(u * 6.283f) * 0.35f) * 6.283f);
-            c = Color.Lerp(c, Color.white, Mathf.Clamp01(ripple - 0.86f) * 0.9f);
-            // vignette
-            float d = Vector2.Distance(new Vector2(u, v), new Vector2(0.5f, 0.55f));
-            c *= Mathf.Lerp(1.05f, 0.82f, Mathf.Clamp01(d * 1.3f));
+            ColorUtility.TryParseHtmlString(hex, out Color c);
+            return c;
+        }
+
+        private static Color StoreIcon(float u, float v) =>
+            Over(Over(Background(u, v), FishShadow(u, v, 0.9f)), BlueFish(u, v, 0.9f));
+
+        private static Color Background(float u, float v)
+        {
+            // Sunny radial gradient
+            float d = Vector2.Distance(new Vector2(u, v), new Vector2(0.5f, 0.56f));
+            Color c = Color.Lerp(SunCenter, SunEdge, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(d / 0.75f)));
+
+            // Water ripples spreading out from Blue
+            Vector2 q = new Vector2(u - 0.5f, v - 0.5f);
+            float r = q.magnitude;
+            float ang = Mathf.Atan2(q.y, q.x);
+            for (int i = 0; i < 3; i++)
+            {
+                float ringR = 0.3f + i * 0.1f + 0.006f * Mathf.Sin(ang * 7f + i * 1.7f);
+                float ring = Mathf.Clamp01(1f - Mathf.Abs(r - ringR) / 0.009f) * (0.42f - i * 0.1f);
+                c = Color.Lerp(c, Color.white, ring);
+            }
+
+            // Bubbles rising at the top right
+            c = Bubble(c, u, v, new Vector2(0.80f, 0.80f), 0.040f);
+            c = Bubble(c, u, v, new Vector2(0.87f, 0.68f), 0.024f);
+            c = Bubble(c, u, v, new Vector2(0.72f, 0.89f), 0.017f);
             c.a = 1f;
             return c;
         }
 
-        /// <summary>Top-down koi swimming upward. <paramref name="scale"/> = fish length as fraction of icon.</summary>
-        private static Color Fish(float u, float v, float scale)
+        private static Color Bubble(Color c, float u, float v, Vector2 center, float radius)
         {
-            // local coords: fish centered, head up
-            float x = (u - 0.5f) / scale;
-            float y = (v - 0.47f) / scale;
-            float aa = 0.004f / scale;
+            float d = Vector2.Distance(new Vector2(u, v), center);
+            if (d > radius * 1.25f) return c;
+            float rim = Mathf.Clamp01(1f - Mathf.Abs(d - radius) / (radius * 0.2f));
+            float fill = d < radius ? 0.22f : 0f;
+            float shine = Vector2.Distance(new Vector2(u, v), center + new Vector2(-0.35f, 0.35f) * radius) < radius * 0.25f ? 0.95f : 0f;
+            return Color.Lerp(c, Color.white, Mathf.Max(rim * 0.9f, Mathf.Max(fill, shine)));
+        }
 
-            // body: ellipse that tapers toward the tail (wide head, slim tail stem)
-            float taper = Mathf.Lerp(0.42f, 1f, Mathf.Clamp01((y + 0.22f) / 0.5f));
-            float body = Ellipse(x / taper, y - 0.06f, 0.15f, 0.36f) * taper;
-            // tail: two lobes fanning out from the tail stem, slightly swishing
-            float tailL = Ellipse(Rotate(x + 0.045f, y + 0.34f, -0.5f), 0.055f, 0.15f);
-            float tailR = Ellipse(Rotate(x - 0.045f, y + 0.34f, 0.5f), 0.055f, 0.15f);
-            // pectoral fins
-            float finL = Ellipse(Rotate(x + 0.15f, y - 0.1f, 0.9f), 0.045f, 0.11f);
-            float finR = Ellipse(Rotate(x - 0.15f, y - 0.1f, -0.9f), 0.045f, 0.11f);
+        /// <summary>Soft shadow of Blue on the background, offset down-right.</summary>
+        private static Color FishShadow(float u, float v, float scale)
+        {
+            Vector2 p = Rotate((u - 0.5f - 0.025f) / scale, (v - 0.5f + 0.035f) / scale, FishAngle);
+            float d = Ellipse(p.x, p.y + 0.02f, 0.2f, 0.42f);
+            float a = Mathf.Clamp01(0.5f - d * 6f) * 0.28f;
+            return new Color(0.62f, 0.2f, 0.05f, a);
+        }
 
-            float shape = Mathf.Min(body, Mathf.Min(Mathf.Min(tailL, tailR), Mathf.Min(finL, finR)));
+        /// <summary>Blue, top-down like in the game: tapered body, light fins, coral tail, big eyes, thick navy outline.</summary>
+        private static Color BlueFish(float u, float v, float scale)
+        {
+            Vector2 p = Rotate((u - 0.5f) / scale, (v - 0.5f) / scale, FishAngle);
+            float x = p.x, y = p.y;
+            float aa = 1.2f / (1024f * scale);
+            const float outlineW = 0.02f;
+
+            float taper = Mathf.Lerp(0.5f, 1f, Mathf.Clamp01((y + 0.26f) / 0.42f));
+            float body = Ellipse(x / taper, y - 0.03f, 0.165f, 0.33f) * taper;
+            float tailL = Ellipse(Rotate(x + 0.05f, y + 0.35f, -0.55f), 0.066f, 0.145f);
+            float tailR = Ellipse(Rotate(x - 0.05f, y + 0.35f, 0.55f), 0.066f, 0.145f);
+            float tail = Mathf.Min(tailL, tailR);
+            float finL = Ellipse(Rotate(x + 0.165f, y - 0.06f, 0.95f), 0.05f, 0.11f);
+            float finR = Ellipse(Rotate(x - 0.165f, y - 0.06f, -0.95f), 0.05f, 0.11f);
+            float fins = Mathf.Min(finL, finR);
+            float shape = Mathf.Min(body, Mathf.Min(tail, fins));
+
+            Color c = Color.clear;
             float alpha = Mathf.Clamp01(0.5f - shape / aa);
-            if (alpha <= 0f)
+            if (alpha > 0f)
             {
-                // soft drop shadow on the water
-                float shadow = Ellipse(x - 0.03f, y - 0.05f, 0.21f, 0.42f);
-                float sa = Mathf.Clamp01(-shadow * 4f + 0.35f) * 0.35f;
-                return new Color(0f, 0.08f, 0.12f, sa);
+                if (body < 0f)
+                {
+                    // Lit from the upper left, a lighter stripe down the back, dark spots, a glossy highlight
+                    float light = Mathf.Clamp01(0.5f - x * 2.2f + (y - 0.05f) * 0.9f);
+                    c = Color.Lerp(BlueDark, BlueLight, light);
+                    float spine = Mathf.Clamp01(1f - Mathf.Abs(x) / 0.07f) * Mathf.Clamp01(1f - Mathf.Abs(y + 0.02f) / 0.24f);
+                    c = Color.Lerp(c, FinColor, spine * 0.35f);
+                    float spots = Mathf.Min(Mathf.Min(
+                        Vector2.Distance(p, new Vector2(0.06f, -0.03f)) - 0.028f,
+                        Vector2.Distance(p, new Vector2(-0.065f, -0.1f)) - 0.022f),
+                        Vector2.Distance(p, new Vector2(0.035f, -0.18f)) - 0.017f);
+                    c = Color.Lerp(c, BlueSpot, Mathf.Clamp01(0.5f - spots / aa) * 0.85f);
+                    float gloss = Ellipse(Rotate(x + 0.075f, y - 0.1f, -0.25f), 0.026f, 0.075f);
+                    c = Color.Lerp(c, Color.white, Mathf.Clamp01(0.5f - gloss / aa) * 0.55f);
+                }
+                else if (tail <= fins)
+                {
+                    c = Color.Lerp(TailDark, TailColor, Mathf.Clamp01((-y - 0.25f) / 0.2f));
+                    // fin rays
+                    if (Mathf.Abs(Frac(x * 28f) - 0.5f) < 0.08f) c = Color.Lerp(c, TailDark, 0.5f);
+                }
+                else
+                {
+                    c = Color.Lerp(FinColor, Color.white, 0.3f);
+                }
+                // Thick cartoon outline
+                c = Color.Lerp(c, Navy, Mathf.Clamp01((shape + outlineW) / aa + 0.5f));
+                c.a = alpha;
             }
 
-            Color c = FishColor;
-            // belly highlight along the spine
-            float spine = Mathf.Clamp01(1f - Mathf.Abs(x) / 0.09f) * Mathf.Clamp01(1f - Mathf.Abs(y - 0.12f) / 0.3f);
-            c = Color.Lerp(c, FishBelly, spine * 0.55f);
-            // fins/tail a bit more transparent-looking
-            if (body > 0f) c = Color.Lerp(c, FishBelly, 0.35f);
-            // koi patches (white), only on the body
-            if (body <= 0f)
-            {
-                float patch1 = Vector2.Distance(new Vector2(x, y), new Vector2(0.04f, 0.14f)) - 0.075f;
-                float patch2 = Vector2.Distance(new Vector2(x, y), new Vector2(-0.035f, -0.06f)) - 0.06f;
-                float patch = Mathf.Min(patch1, patch2);
-                c = Color.Lerp(c, new Color(1f, 0.97f, 0.93f), Mathf.Clamp01(0.5f - patch / aa));
-            }
-            // eyes
-            float eyeL = Vector2.Distance(new Vector2(x, y), new Vector2(-0.075f, 0.33f));
-            float eyeR = Vector2.Distance(new Vector2(x, y), new Vector2(0.075f, 0.33f));
-            if (Mathf.Min(eyeL, eyeR) < 0.028f) c = new Color(0.1f, 0.06f, 0.05f);
-            c.a = alpha;
+            // Big eyes on top (they bulge past the body's edge, like in the game)
+            c = Over4(c, Eye(p, new Vector2(-0.088f, 0.22f), aa));
+            c = Over4(c, Eye(p, new Vector2(0.088f, 0.22f), aa));
+            return c;
+        }
+
+        private static Color Eye(Vector2 p, Vector2 center, float aa)
+        {
+            const float r = 0.07f, ring = 0.016f;
+            float d = Vector2.Distance(p, center) - r;
+            float a = Mathf.Clamp01(0.5f - d / aa);
+            if (a <= 0f) return Color.clear;
+            Color c = Color.white;
+            // Looking ahead (up the river)
+            Vector2 pupilC = center + new Vector2(0.008f, 0.022f);
+            float pupil = Vector2.Distance(p, pupilC) - 0.04f;
+            c = Color.Lerp(c, Pupil, Mathf.Clamp01(0.5f - pupil / aa));
+            float shine = Vector2.Distance(p, pupilC + new Vector2(-0.013f, 0.014f)) - 0.014f;
+            c = Color.Lerp(c, Color.white, Mathf.Clamp01(0.5f - shine / aa));
+            float shine2 = Vector2.Distance(p, pupilC + new Vector2(0.015f, -0.014f)) - 0.006f;
+            c = Color.Lerp(c, Color.white, Mathf.Clamp01(0.5f - shine2 / aa));
+            c = Color.Lerp(c, Navy, Mathf.Clamp01((d + ring) / aa + 0.5f));
+            c.a = a;
+            return c;
+        }
+
+        private static float Frac(float x) => x - Mathf.Floor(x);
+
+        /// <summary>Alpha-over that keeps transparency (for layers drawn on a transparent foreground).</summary>
+        private static Color Over4(Color dst, Color src)
+        {
+            float a = src.a + dst.a * (1f - src.a);
+            if (a <= 0f) return Color.clear;
+            Color c = (src * src.a + dst * dst.a * (1f - src.a)) / a;
+            c.a = a;
             return c;
         }
 

@@ -9,7 +9,8 @@ namespace Upstream.Data
         public float startSpeed = 140f;
         /// <summary>Speed the distance curve eases toward (see DifficultyScaler.SpeedForDistance).</summary>
         public float maxSpeed = 420f;
-        public float playerMoveSmoothing = 12f;
+        /// <summary>How fast the fish catches up with the finger (exponential, per second): 22 = ~45 ms lag.</summary>
+        public float playerMoveSmoothing = 22f;
         public float turboSpeedMultiplier = 1.7f;
         public float turboTime = 3.2f;
         /// <summary>One health bar; each hit takes a HitDamage amount from it.</summary>

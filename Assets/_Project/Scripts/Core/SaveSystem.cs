@@ -27,6 +27,8 @@ namespace Upstream.Core
         /// <summary>IDs from FishCatalog the player owns. The starter fish (0) is always owned.</summary>
         public List<int> ownedFish = new List<int> { 0 };
         public int equippedFish;
+        /// <summary>Steering sensitivity: 0 low, 1 medium, 2 high (see ControlSettings). Missing in old saves = medium.</summary>
+        public int settingsSensitivity = 1;
     }
 
     public static class SaveSystem

@@ -110,8 +110,9 @@ namespace Upstream.Data
             var list = new List<FishDef>
             {
                 // ---- COMMON ----
-                new FishDef { id = 0, nameTr = "Turuncu Alabalık", nameEn = "Orange Trout", price = 0, rarity = FishRarity.Common, ability = FishAbility.None,
-                    body = C("#FF8A5C"), belly = C("#FFD2B8"), accent = C("#4F1F14"), fin = C("#FFD2B8"), tail = C("#FF8052"), pattern = FishPattern.Spots },
+                // The hero of Blue's River (same look as the app icon).
+                new FishDef { id = 0, nameTr = "Blue", nameEn = "Blue", price = 0, rarity = FishRarity.Common, ability = FishAbility.None,
+                    body = C("#3E9BF0"), belly = C("#CDEBFF"), accent = C("#1B4F9C"), fin = C("#CDEBFF"), tail = C("#FF6B5E"), pattern = FishPattern.Spots },
                 new FishDef { id = 1, nameTr = "Çamur Balığı", nameEn = "Mudfish", price = 300, rarity = FishRarity.Common, ability = FishAbility.Slim,
                     body = C("#8A6A4A"), belly = C("#C9AE8A"), accent = C("#5A4330"), fin = C("#A88A66"), tail = C("#7A5C3E"), pattern = FishPattern.Plain,
                     width = 0.92f, length = 1.02f },

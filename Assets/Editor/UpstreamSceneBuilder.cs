@@ -131,6 +131,36 @@ namespace Upstream.EditorTools
             EditorApplication.Exit(ok ? 0 : 1);
         }
 
+        /// <summary>
+        /// Exports the iPhone/iPad Xcode project to Builds/iOS. Needs Unity's "iOS Build Support" module;
+        /// the app itself is then built and signed in Xcode on a Mac (Apple Developer account required).
+        /// </summary>
+        [MenuItem("Upstream/7. Export iOS Xcode Project (iPhone + iPad)", priority = 32)]
+        public static void BuildIosXcodeProject()
+        {
+            if (!File.Exists(ScenePath)) BuildAndSaveGameScene();
+            if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.iOS, BuildTarget.iOS))
+            {
+                Debug.LogError("[Upstream] iOS Build Support is not installed: add it to this Unity version in Unity Hub (Installs > Add modules).");
+                return;
+            }
+
+            PlayerSettings.companyName = "EmirCan";
+            PlayerSettings.productName = "Blue’s River";
+            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.iOS, "com.emircan.upstream");
+            PlayerSettings.iOS.targetDevice = iOSTargetDevice.iPhoneAndiPad;
+            PlayerSettings.SetScriptingBackend(UnityEditor.Build.NamedBuildTarget.iOS, ScriptingImplementation.IL2CPP);
+            ReleaseSettings.Apply();
+
+            BuildReport report = BuildPipeline.BuildPlayer(new[] { ScenePath }, "Builds/iOS", BuildTarget.iOS, BuildOptions.None);
+            if (report.summary.result != BuildResult.Succeeded)
+            {
+                Debug.LogError($"[Upstream] iOS export FAILED ({report.summary.result}).");
+                return;
+            }
+            Debug.Log("[Upstream] Xcode project exported to Builds/iOS. Open Unity-iPhone.xcodeproj on a Mac to build and sign.");
+        }
+
         private static bool BuildAndroid(bool appBundle)
         {
             if (!File.Exists(ScenePath)) BuildAndSaveGameScene();

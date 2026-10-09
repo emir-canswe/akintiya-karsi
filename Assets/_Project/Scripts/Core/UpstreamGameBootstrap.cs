@@ -56,7 +56,7 @@ namespace Upstream.Core
                 return;
             }
             initialized = true;
-            Application.targetFrameRate = 60;
+            Application.targetFrameRate = TargetFrameRateFor(Screen.currentResolution.refreshRateRatio.value);
             // Collisions are computed by CollisionManager; Unity's physics would only simulate the idle player collider.
             Physics2D.simulationMode = SimulationMode2D.Script;
             Physics.simulationMode = SimulationMode.Script;
@@ -64,6 +64,16 @@ namespace Upstream.Core
             BuildEntireGame();
 
             LocalizationManager.OnLanguageChanged += HandleLanguageChanged;
+        }
+
+        /// <summary>
+        /// Run at the screen's own refresh rate (60 / 90 / 120 Hz): 60 fps on a 90 Hz phone shows frames
+        /// unevenly (judder) and adds touch lag. Capped at 120; unknown or odd rates fall back to 60.
+        /// </summary>
+        public static int TargetFrameRateFor(double refreshHz)
+        {
+            if (double.IsNaN(refreshHz) || refreshHz < 59.0) return 60;
+            return Mathf.Clamp((int)System.Math.Round(refreshHz), 60, 120);
         }
 
         private void OnDestroy()
@@ -313,6 +323,7 @@ namespace Upstream.Core
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(360f, 640f);
             scaler.matchWidthOrHeight = 0.5f;
+            canvasObj.AddComponent<AdaptiveCanvasScaler>(); // tablets: match height so the menu isn't squashed
 
             canvasObj.AddComponent<GraphicRaycaster>();
 
@@ -631,7 +642,7 @@ namespace Upstream.Core
             dim.sprite = whiteSpr;
             dim.color = new Color(0.02f, 0.08f, 0.25f, 0.6f); // also swallows taps meant for screens below
 
-            GameObject card = CreateUIRect("Card", root.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 330f));
+            GameObject card = CreateUIRect("Card", root.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 390f));
             Image cardBg = card.AddComponent<Image>();
             cardBg.sprite = roundSpr;
             cardBg.type = Image.Type.Sliced;
@@ -663,10 +674,25 @@ namespace Upstream.Core
             Button english = CreateTextButton("LangEN", picker.transform, new Vector2(0.5f, 0.5f), new Vector2(26f, 0f), new Vector2(50f, 28f), null, roundSpr, Color.clear, 14f, Color.white);
             english.GetComponentInChildren<TMP_Text>().text = "EN";
 
+            // Steering sensitivity row: Low | Medium | High segmented picker.
+            Button sensitivityRow = CreateSettingsRow("SensitivityRow", card.transform, -280f, "sens_label", roundSpr, false);
+            GameObject sensPicker = CreateUIRect("SensPicker", sensitivityRow.transform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-69f, 0f), new Vector2(128f, 34f));
+            Image sensPickerBg = sensPicker.AddComponent<Image>();
+            sensPickerBg.sprite = roundSpr;
+            sensPickerBg.type = Image.Type.Sliced;
+            sensPickerBg.color = new Color(0f, 0f, 0f, 0.22f);
+            string[] sensKeys = { "sens_low", "sens_mid", "sens_high" };
+            var sensButtons = new Button[sensKeys.Length];
+            for (int i = 0; i < sensKeys.Length; i++)
+            {
+                sensButtons[i] = CreateTextButton($"Sens{i}", sensPicker.transform, new Vector2(0.5f, 0.5f), new Vector2((i - 1) * 41f, 0f), new Vector2(40f, 28f), sensKeys[i], roundSpr, Color.clear, 12f, Color.white);
+            }
+
             Button close = CreateTextButton("Close", card.transform, new Vector2(0.5f, 0f), new Vector2(0f, 42f), new Vector2(264f, 48f), "close_btn", roundSpr, new Color(1f, 0.54f, 0.36f, 1f), 18f, new Color(0.17f, 0.05f, 0f, 1f));
 
             SettingsScreen screen = root.AddComponent<SettingsScreen>();
             screen.Configure(soundRow, soundSwitch, vibrationRow, vibrationSwitch, turkish, english, close, card.GetComponent<RectTransform>());
+            screen.ConfigureSensitivity(sensButtons);
             root.SetActive(false);
             return screen;
         }

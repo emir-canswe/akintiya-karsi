@@ -23,7 +23,20 @@ namespace Upstream.UI
         private Button turkishButton;
         private Button englishButton;
         private RectTransform card;
+        private Button[] sensitivityButtons;
         private float popTime = PopDuration;
+
+        /// <summary>Low / Medium / High steering sensitivity picker (index = ControlSettings level).</summary>
+        public void ConfigureSensitivity(Button[] buttons)
+        {
+            sensitivityButtons = buttons;
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                int level = i;
+                buttons[i].onClick.AddListener(() => ControlSettings.SetLevel(level));
+            }
+            Refresh(false);
+        }
 
         public void Configure(Button soundRow, ToggleSwitch soundSw, Button vibrationRow, ToggleSwitch vibrationSw,
                               Button turkish, Button english, Button close, RectTransform cardRect)
@@ -47,6 +60,7 @@ namespace Upstream.UI
         {
             AudioManager.OnSettingsChanged += RefreshAnimated;
             LocalizationManager.OnLanguageChanged += RefreshAnimated;
+            ControlSettings.OnChanged += RefreshAnimated;
             GameEvents.OnGameStart += Close;
             GameEvents.OnGameResume += Close;
         }
@@ -55,6 +69,7 @@ namespace Upstream.UI
         {
             AudioManager.OnSettingsChanged -= RefreshAnimated;
             LocalizationManager.OnLanguageChanged -= RefreshAnimated;
+            ControlSettings.OnChanged -= RefreshAnimated;
             GameEvents.OnGameStart -= Close;
             GameEvents.OnGameResume -= Close;
             UIBackStack.Remove(Close);
@@ -109,6 +124,12 @@ namespace Upstream.UI
             bool turkish = LocalizationManager.CurrentLanguage == LocalizationManager.Turkish;
             StyleLanguageButton(turkishButton, turkish);
             StyleLanguageButton(englishButton, !turkish);
+
+            if (sensitivityButtons != null)
+            {
+                int level = ControlSettings.Level;
+                for (int i = 0; i < sensitivityButtons.Length; i++) StyleLanguageButton(sensitivityButtons[i], i == level);
+            }
         }
 
         private static void StyleLanguageButton(Button button, bool selected)
