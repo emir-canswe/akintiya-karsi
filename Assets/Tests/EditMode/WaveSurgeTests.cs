@@ -22,18 +22,28 @@ namespace Upstream.Tests
         }
 
         [Test]
-        public void FirstSet_ComesWithinAReachableSpeed_AndSlowsTheRiverClearly()
+        public void Sets_StartAt2000m_ThenEvery500m()
         {
             var cfg = ScriptableObject.CreateInstance<GameConfig>();
-            Assert.Greater(cfg.waveSurgeSpeed, cfg.startSpeed);
-            Assert.GreaterOrEqual(cfg.waveSurgeFromMeters, 2000f, "Big waves only come late, when the river is really fast.");
-            Assert.LessOrEqual(cfg.waveSurgeSpeed,
-                DifficultyScaler.SpeedForDistance(cfg.waveSurgeFromMeters, cfg.startSpeed, cfg.maxSpeed),
-                "At that distance the river is fast enough for the first set.");
-            Assert.Less(cfg.waveSurgeSpeed, cfg.maxSpeed, "The speed limit must be reached in a normal run.");
-            Assert.GreaterOrEqual(cfg.waveSurgeCount * cfg.waveSpeedDrop, 50f, "A set should be felt.");
-            Assert.Greater(cfg.waveSurgeSpeed - cfg.waveSurgeCount * cfg.waveSpeedDrop, cfg.startSpeed,
-                "A set slows the river down, but not back to a standstill start.");
+            Assert.AreEqual(2000f, cfg.waveSurgeFromMeters, "Big waves only come late, when the river is really fast.");
+            Assert.AreEqual(500f, cfg.waveSurgeEveryMeters);
+            Assert.AreEqual(2500f, RiverController.NextSurgeMeters(2000f, 2000f, 500f));
+            Assert.AreEqual(3000f, RiverController.NextSurgeMeters(2500.5f, 2000f, 500f));
+            // A continue far past a missed set doesn't fire several sets at once.
+            Assert.AreEqual(4000f, RiverController.NextSurgeMeters(3720f, 2000f, 500f));
+        }
+
+        [Test]
+        public void ASet_IsFelt_AndTheSpeedIsBackBeforeTheNextSet()
+        {
+            var cfg = ScriptableObject.CreateInstance<GameConfig>();
+            float setDrop = cfg.waveSurgeCount * cfg.waveSpeedDrop;
+            Assert.GreaterOrEqual(setDrop, 50f, "A set should be felt.");
+            float recoverMeters = setDrop / cfg.waveReliefRecoveryPerMeter;
+            Assert.Less(recoverMeters, cfg.waveSurgeEveryMeters, "Full speed again before the next set: the river doesn't keep slowing down.");
+            Assert.Greater(recoverMeters, 200f, "The breather lasts a while.");
+            float speedAt2000 = DifficultyScaler.SpeedForDistance(cfg.waveSurgeFromMeters, cfg.startSpeed, cfg.maxSpeed);
+            Assert.Greater(speedAt2000 - setDrop, cfg.startSpeed * 2f, "Still a fast river during the breather.");
         }
 
         [Test]

@@ -25,19 +25,19 @@ namespace Upstream.Data
         public int legendaryBonusHP = 15;
 
         [Header("Big waves")]
-        /// <summary>No big waves before this distance: they belong to a really fast river, late in a run.</summary>
+        /// <summary>First set of big waves: only late in a run, when the river is really fast.</summary>
         public float waveSurgeFromMeters = 2000f;
-        /// <summary>River speed needed for a set of big waves (past <see cref="waveSurgeFromMeters"/>).</summary>
-        public float waveSurgeSpeed = 340f;
-        /// <summary>
-        /// A following set needs the river back at the last set's speed plus this; 0 = as soon as it is as fast again
-        /// (about 1300 m later, since the river speeds up slowly that far in).
-        /// </summary>
-        public float waveSurgeSpeedStep = 0f;
+        /// <summary>After the first set, another one every this many meters.</summary>
+        public float waveSurgeEveryMeters = 500f;
         /// <summary>Big waves in one set (well spaced, see SpawnManager.SurgeWaveSpacing).</summary>
         public int waveSurgeCount = 2;
-        /// <summary>River speed every big wave takes away for good (it then builds up again with distance).</summary>
+        /// <summary>River speed every big wave takes away (won back gradually, see waveReliefRecoveryPerMeter).</summary>
         public float waveSpeedDrop = 35f;
+        /// <summary>
+        /// Speed the river wins back per meter after big waves: a set's 70 is back in ~390 m, so every set
+        /// gives a breather but the river is full speed again before the next one.
+        /// </summary>
+        public float waveReliefRecoveryPerMeter = 0.18f;
 
         [Header("Power")]
         public float powerPerFood = 12f;

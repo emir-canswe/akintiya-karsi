@@ -177,9 +177,20 @@ namespace Upstream.Tests
             {
                 int cap = SpawnManager.MaxPredatorsFor(m);
                 Assert.GreaterOrEqual(cap, prev, "the cap never shrinks with distance");
-                Assert.LessOrEqual(cap, 5, "never a swarm");
+                Assert.LessOrEqual(cap, m < SpawnManager.LateFromMeters ? 5 : SpawnManager.MaxPredatorsCap, "never a swarm");
                 prev = cap;
             }
+            // Late game: more at 2000 m, and more again every 1000 m.
+            Assert.AreEqual(5, SpawnManager.MaxPredatorsFor(1999f));
+            Assert.AreEqual(6, SpawnManager.MaxPredatorsFor(2000f));
+            Assert.AreEqual(7, SpawnManager.MaxPredatorsFor(3000f));
+            Assert.AreEqual(8, SpawnManager.MaxPredatorsFor(4000f));
+            Assert.AreEqual(SpawnManager.MaxPredatorsCap, SpawnManager.MaxPredatorsFor(50000f));
+            Assert.AreEqual(1f, SpawnManager.LateGapMultiplier(1500f));
+            Assert.Less(SpawnManager.LateGapMultiplier(3000f), SpawnManager.LateGapMultiplier(2000f));
+            Assert.GreaterOrEqual(SpawnManager.LateGapMultiplier(50000f), 0.55f);
+            Assert.AreEqual(1f, SpawnManager.LatePredatorWeight(1500f));
+            Assert.Greater(SpawnManager.LatePredatorWeight(2000f), 1f);
             Assert.AreEqual(2, SpawnManager.PiranhaSchoolSize(SpawnManager.PiranhaFromMeters));
             Assert.AreEqual(3, SpawnManager.PiranhaSchoolSize(SpawnManager.PiranhaTrioFromMeters));
 

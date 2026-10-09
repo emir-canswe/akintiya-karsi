@@ -19,10 +19,10 @@ namespace Upstream.River
         private float currentBaseSpeed = 150f;
         private float slowdownTimer;
         private bool isTurbo;
-        // River speed taken away for good by big waves; the distance curve keeps climbing on top of it.
+        // River speed taken away by big waves; won back little by little as the fish swims on.
         private float speedRelief;
-        // Base speed at which the next set of big waves rolls in.
-        private float nextSurgeSpeed = 260f;
+        // Distance (m) at which the next set of big waves rolls in.
+        private float nextSurgeMeters = 2000f;
 
         /// <summary>River speed (before turbo and slowdowns) the distance curve currently aims for.</summary>
         public float BaseSpeed => currentBaseSpeed;
@@ -64,7 +64,7 @@ namespace Upstream.River
             if (scaler == null) scaler = FindFirstObjectByType<DifficultyScaler>();
             if (scoreSystem == null) scoreSystem = FindFirstObjectByType<ScoreSystem>();
             currentBaseSpeed = Config.startSpeed;
-            nextSurgeSpeed = Config.waveSurgeSpeed;
+            nextSurgeMeters = Config.waveSurgeFromMeters;
         }
 
         private void OnEnable()
@@ -91,7 +91,7 @@ namespace Upstream.River
             slowdownTimer = Mathf.Max(slowdownTimer, duration);
         }
 
-        /// <summary>A big wave rolled over the fish: the river loses some speed for good, plus a short jolt.</summary>
+        /// <summary>A big wave rolled over the fish: the river loses some speed (won back over the next few hundred meters), plus a short jolt.</summary>
         public void ApplyBigWave()
         {
             speedRelief += Config.waveSpeedDrop;
@@ -101,6 +101,14 @@ namespace Upstream.River
         /// <summary>
         /// Speed the river eases toward: the distance curve minus what big waves took away, never below the start speed.
         /// </summary>
+        /// <summary>Distance of the next set of big waves after one at <paramref name="meters"/>: the next multiple of the spacing past the first set.</summary>
+        public static float NextSurgeMeters(float meters, float firstAt, float every)
+        {
+            if (every <= 0f) return float.PositiveInfinity;
+            float sets = Mathf.Floor(Mathf.Max(0f, meters - firstAt) / every) + 1f;
+            return firstAt + sets * every;
+        }
+
         public static float TargetSpeed(float meters, float startSpeed, float maxSpeed, float relief) =>
             Mathf.Max(startSpeed, DifficultyScaler.SpeedForDistance(meters, startSpeed, maxSpeed) - Mathf.Max(0f, relief));
 
@@ -120,11 +128,10 @@ namespace Upstream.River
                 float rate = target < currentBaseSpeed ? 45f : 15f;
                 currentBaseSpeed = Mathf.MoveTowards(currentBaseSpeed, target, rate * Time.deltaTime);
 
-                // Very fast, far into the run: send a set of big waves; the next set waits until the river is
-                // back at this speed.
-                if (meters >= Config.waveSurgeFromMeters && currentBaseSpeed >= nextSurgeSpeed)
+                // Late in the run (2000 m+): a set of big waves, then another every 500 m.
+                if (meters >= nextSurgeMeters)
                 {
-                    nextSurgeSpeed = currentBaseSpeed + Mathf.Max(1f, Config.waveSurgeSpeedStep);
+                    nextSurgeMeters = NextSurgeMeters(meters, Config.waveSurgeFromMeters, Config.waveSurgeEveryMeters);
                     GameEvents.OnWaveSurge?.Invoke();
                 }
             }
@@ -136,6 +143,10 @@ namespace Upstream.River
             {
                 float deltaDist = flow * Time.deltaTime;
                 GameManager.Instance.CurrentDistance += deltaDist;
+                if (speedRelief > 0f && Config.distanceToMetersDivisor > 0f)
+                {
+                    speedRelief = Mathf.Max(0f, speedRelief - Config.waveReliefRecoveryPerMeter * deltaDist / Config.distanceToMetersDivisor);
+                }
                 if (scoreSystem != null)
                 {
                     scoreSystem.AddDistance(deltaDist);
@@ -170,7 +181,7 @@ namespace Upstream.River
             slowdownTimer = 0f;
             isTurbo = false;
             speedRelief = 0f;
-            nextSurgeSpeed = Config.waveSurgeSpeed;
+            nextSurgeMeters = Config.waveSurgeFromMeters;
         }
     }
 }

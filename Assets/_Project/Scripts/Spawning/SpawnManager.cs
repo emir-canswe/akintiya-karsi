@@ -174,7 +174,7 @@ namespace Upstream.Spawning
                 // so the player always has the same moment to react.
                 float easy = spawnConfig != null ? spawnConfig.spawnGapSecondsEasy : 1.7f;
                 float hard = spawnConfig != null ? spawnConfig.spawnGapSecondsHard : 1.0f;
-                float gap = SpawnGapSeconds(diff, easy, hard) * Random.Range(0.85f, 1.15f);
+                float gap = SpawnGapSeconds(diff, easy, hard) * LateGapMultiplier(Meters(currentDistance)) * Random.Range(0.85f, 1.15f);
                 nextSpawnDistance = currentDistance + Mathf.Max(85f, gap * flowSpeed);
             }
 
@@ -206,8 +206,28 @@ namespace Upstream.Spawning
         /// <summary>Piranhas come in pairs, then in threes from here on.</summary>
         public const float PiranhaTrioFromMeters = 800f;
 
-        /// <summary>Most predators allowed on screen at once: 2 at the start, one more every 600 m, at most 5.</summary>
-        public static int MaxPredatorsFor(float meters) => Mathf.Min(5, 2 + Mathf.FloorToInt(Mathf.Max(0f, meters) / 600f));
+        /// <summary>From here on the run turns into the late game: harder, and harder again every LateStepMeters.</summary>
+        public const float LateFromMeters = 2000f;
+        public const float LateStepMeters = 1000f;
+        /// <summary>Most predators ever on screen at once.</summary>
+        public const int MaxPredatorsCap = 10;
+
+        /// <summary>0 before 2000 m, then 1 at 2000 m, 2 at 3000 m, 3 at 4000 m...</summary>
+        public static int LateLevel(float meters) =>
+            meters < LateFromMeters ? 0 : 1 + Mathf.FloorToInt((meters - LateFromMeters) / LateStepMeters);
+
+        /// <summary>
+        /// Most predators allowed on screen at once: 2 at the start, one more every 600 m up to 5;
+        /// past 2000 m one more for every late level (6 at 2000 m, 7 at 3000 m...), at most 10.
+        /// </summary>
+        public static int MaxPredatorsFor(float meters) =>
+            Mathf.Min(MaxPredatorsCap, Mathf.Min(5, 2 + Mathf.FloorToInt(Mathf.Max(0f, meters) / 600f)) + LateLevel(meters));
+
+        /// <summary>Late game: patterns come 10% closer together per late level (never under 55% of the gap).</summary>
+        public static float LateGapMultiplier(float meters) => Mathf.Max(0.55f, 1f - 0.1f * LateLevel(meters));
+
+        /// <summary>Late game: predators get picked more often, +30% per late level (at most 2.5x).</summary>
+        public static float LatePredatorWeight(float meters) => Mathf.Min(2.5f, 1f + 0.3f * LateLevel(meters));
 
         public static int PiranhaSchoolSize(float meters) => meters >= PiranhaTrioFromMeters ? 3 : 2;
 
@@ -311,6 +331,7 @@ namespace Upstream.Spawning
             }
 
             FillWeights(difficulty);
+            weightBuffer[(int)PatternType.Shark] *= LatePredatorWeight(meters);
             PatternType pattern = PickPattern(Random.value, weightBuffer);
 
             // Missing pool -> degrade to a food line instead of silently spawning nothing.
