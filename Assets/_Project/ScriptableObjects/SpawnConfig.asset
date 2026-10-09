@@ -12,9 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c6a755f92479ea47980903af09d1425, type: 3}
   m_Name: SpawnConfig
   m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.SpawnConfig
-  minSpawnInterval: 140
-  maxSpawnInterval: 215
-  intervalReductionPerDifficulty: 85
+  spawnGapSecondsEasy: 1.7
+  spawnGapSecondsHard: 1
   foodPerLineMin: 3
   foodPerLineMax: 6
   goldFoodBaseChance: 0.07

@@ -18,10 +18,10 @@ namespace Upstream.Data
     [CreateAssetMenu(fileName = "DifficultyConfig", menuName = "Upstream/Difficulty Config")]
     public class DifficultyConfig : ScriptableObject
     {
-        /// <summary>Distance (world units, 10 per meter) over which difficulty climbs to 1.</summary>
-        public float difficultyRampDistance = 12000f;
-        /// <summary>Difficulty at the very start of a run (0..1): no "too easy" warm-up.</summary>
-        public float startingDifficulty = 0.15f;
+        /// <summary>Distance (world units, 10 per meter) over which difficulty climbs to 1 (3000 m).</summary>
+        public float difficultyRampDistance = 30000f;
+        /// <summary>Difficulty at the very start of a run (0..1): the first few hundred meters are a gentle warm-up.</summary>
+        public float startingDifficulty = 0f;
 
         public RegionData[] regions = new RegionData[]
         {

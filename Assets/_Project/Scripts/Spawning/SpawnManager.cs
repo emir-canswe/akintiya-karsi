@@ -149,12 +149,14 @@ namespace Upstream.Spawning
                 float diff = difficultyScaler != null
                     ? difficultyScaler.GetDifficulty(currentDistance)
                     : DifficultyScaler.CalculateDifficulty(currentDistance, DifficultyScaler.DefaultRampDistance);
-                SpawnPattern(currentStage, diff);
+                SpawnPattern(currentStage, diff, Meters(currentDistance));
 
-                float minInt = spawnConfig != null ? spawnConfig.minSpawnInterval : 150f;
-                float maxInt = spawnConfig != null ? spawnConfig.maxSpawnInterval : 230f;
-                float reduction = diff * (spawnConfig != null ? spawnConfig.intervalReductionPerDifficulty : 50f);
-                nextSpawnDistance = currentDistance + Mathf.Max(85f, Random.Range(minInt, maxInt) - reduction);
+                // Spaced in time, not distance: as the river speeds up, patterns get further apart in meters
+                // so the player always has the same moment to react.
+                float easy = spawnConfig != null ? spawnConfig.spawnGapSecondsEasy : 1.7f;
+                float hard = spawnConfig != null ? spawnConfig.spawnGapSecondsHard : 1.0f;
+                float gap = SpawnGapSeconds(diff, easy, hard) * Random.Range(0.85f, 1.15f);
+                nextSpawnDistance = currentDistance + Mathf.Max(85f, gap * flowSpeed);
             }
 
             for (int i = activeEntities.Count - 1; i >= 0; i--)
@@ -171,6 +173,59 @@ namespace Upstream.Spawning
         }
 
         public enum PatternType { FoodLine, Rocks, Log, Shark, Hook }
+
+        // ---- Difficulty curve (pure, unit-tested) ----
+
+        /// <summary>Seconds between two spawn patterns: <paramref name="easy"/> at difficulty 0 down to <paramref name="hard"/> at 1.</summary>
+        public static float SpawnGapSeconds(float difficulty, float easy = 1.7f, float hard = 1.0f) =>
+            Mathf.Lerp(easy, hard, Mathf.Clamp01(difficulty));
+
+        /// <summary>Meters at which each predator first shows up: the line-up changes the further you swim.</summary>
+        public const float PiranhaFromMeters = 250f;
+        public const float PikeFromMeters = 600f;
+        public const float CatfishFromMeters = 1000f;
+        /// <summary>Piranhas come in pairs, then in threes from here on.</summary>
+        public const float PiranhaTrioFromMeters = 800f;
+
+        /// <summary>Most predators allowed on screen at once: 2 at the start, one more every 600 m, at most 5.</summary>
+        public static int MaxPredatorsFor(float meters) => Mathf.Min(5, 2 + Mathf.FloorToInt(Mathf.Max(0f, meters) / 600f));
+
+        public static int PiranhaSchoolSize(float meters) => meters >= PiranhaTrioFromMeters ? 3 : 2;
+
+        /// <summary>
+        /// Which predator shows up at this distance. <paramref name="r"/> is uniform in [0,1).
+        /// Only sharks at first; piranhas, then pikes, then catfish join, and sharks get rarer once pikes arrive.
+        /// </summary>
+        public static PredatorKind PickPredator(float meters, float r)
+        {
+            float shark = meters >= PikeFromMeters ? 0.6f : 1f;
+            float piranha = meters >= PiranhaFromMeters ? 0.8f : 0f;
+            float pike = meters >= PikeFromMeters ? 0.8f : 0f;
+            float catfish = meters >= CatfishFromMeters ? 0.6f : 0f;
+            float t = Mathf.Clamp01(r) * (shark + piranha + pike + catfish);
+            if ((t -= shark) < 0f) return PredatorKind.Shark;
+            if ((t -= piranha) < 0f) return PredatorKind.Piranha;
+            if ((t -= pike) < 0f) return PredatorKind.Pike;
+            return catfish > 0f ? PredatorKind.Catfish : PredatorKind.Shark;
+        }
+
+        private float Meters(float distance)
+        {
+            float divisor = gameConfig != null && gameConfig.distanceToMetersDivisor > 0f ? gameConfig.distanceToMetersDivisor : 10f;
+            return distance / divisor;
+        }
+
+        /// <summary>Predators currently swimming (not knocked away).</summary>
+        private int ActivePredators()
+        {
+            int n = 0;
+            for (int i = 0; i < activeEntities.Count; i++)
+            {
+                var e = activeEntities[i];
+                if (e.Type == EntityType.Shark && e.isActive && !e.isFlying) n++;
+            }
+            return n;
+        }
 
         // Scratch buffer for weights: avoids allocating every spawn.
         private readonly float[] weightBuffer = new float[5];
@@ -220,7 +275,7 @@ namespace Upstream.Spawning
             weightBuffer[4] = Mathf.Lerp(c.diff0HookWeight, c.diff1HookWeight, difficulty);
         }
 
-        private void SpawnPattern(int stage, float difficulty)
+        private void SpawnPattern(int stage, float difficulty, float meters)
         {
             if (foodPool == null) return;
 
@@ -246,6 +301,15 @@ namespace Upstream.Spawning
                 (pattern == PatternType.Hook && hookPool == null))
             {
                 pattern = PatternType.FoodLine;
+            }
+
+            // Never crowd the river: too many predators already swimming -> a breather (food) instead.
+            PredatorKind kind = PredatorKind.Shark;
+            if (pattern == PatternType.Shark)
+            {
+                kind = PickPredator(meters, Random.value);
+                int count = kind == PredatorKind.Piranha ? PiranhaSchoolSize(meters) : 1;
+                if (ActivePredators() + count > MaxPredatorsFor(meters)) pattern = PatternType.FoodLine;
             }
 
             switch (pattern)
@@ -341,15 +405,14 @@ namespace Upstream.Spawning
 
                 case PatternType.Shark: // A predator: shark, pike, piranha school or catfish
                 {
-                    PredatorKind kind = PickPredator(difficulty);
                     float px = Random.Range(-rw + 40f, rw - 40f);
                     if (kind == PredatorKind.Piranha)
                     {
-                        // School of three in a little V
+                        // School in a little V: a pair at first, three later on
                         px = Mathf.Clamp(px, -rw + 60f, rw - 60f);
-                        SpawnPredator(kind, new Vector2(px, startY + 40f), stage, difficulty);
                         SpawnPredator(kind, new Vector2(px - 30f, startY + 72f), stage, difficulty);
                         SpawnPredator(kind, new Vector2(px + 30f, startY + 72f), stage, difficulty);
+                        if (PiranhaSchoolSize(meters) >= 3) SpawnPredator(kind, new Vector2(px, startY + 40f), stage, difficulty);
                     }
                     else
                     {
@@ -385,20 +448,6 @@ namespace Upstream.Spawning
                     break;
                 }
             }
-        }
-
-        /// <summary>Which predator shows up: sharks from the start, the others join as the run gets harder.</summary>
-        private static PredatorKind PickPredator(float difficulty)
-        {
-            float shark = 1f;
-            float pike = difficulty > 0.2f ? 0.8f : 0f;
-            float piranha = difficulty > 0.3f ? 0.7f : 0f;
-            float catfish = difficulty > 0.35f ? 0.5f : 0f;
-            float r = Random.value * (shark + pike + piranha + catfish);
-            if ((r -= shark) < 0f) return PredatorKind.Shark;
-            if ((r -= pike) < 0f) return PredatorKind.Pike;
-            if ((r -= piranha) < 0f) return PredatorKind.Piranha;
-            return PredatorKind.Catfish;
         }
 
         private void SpawnPredator(PredatorKind kind, Vector2 pos, int stage, float difficulty)

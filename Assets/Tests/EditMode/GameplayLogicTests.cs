@@ -89,6 +89,45 @@ namespace Upstream.Tests
             Assert.Greater(cfg.diff0FoodLineWeight, 0f);
         }
 
+        // --- Predator line-up and crowding ---
+
+        private static System.Collections.Generic.HashSet<PredatorKind> KindsAt(float meters)
+        {
+            var kinds = new System.Collections.Generic.HashSet<PredatorKind>();
+            for (float r = 0f; r < 1f; r += 0.01f) kinds.Add(SpawnManager.PickPredator(meters, r));
+            return kinds;
+        }
+
+        [Test]
+        public void PickPredator_NewKindsJoinTheFurtherYouSwim()
+        {
+            CollectionAssert.AreEquivalent(new[] { PredatorKind.Shark }, KindsAt(0f), "only sharks at the start");
+            CollectionAssert.AreEquivalent(new[] { PredatorKind.Shark, PredatorKind.Piranha }, KindsAt(SpawnManager.PiranhaFromMeters));
+            CollectionAssert.AreEquivalent(new[] { PredatorKind.Shark, PredatorKind.Piranha, PredatorKind.Pike }, KindsAt(SpawnManager.PikeFromMeters));
+            CollectionAssert.AreEquivalent(new[] { PredatorKind.Shark, PredatorKind.Piranha, PredatorKind.Pike, PredatorKind.Catfish },
+                KindsAt(SpawnManager.CatfishFromMeters));
+        }
+
+        [Test]
+        public void Predators_AreCappedAndSpacedInTime()
+        {
+            Assert.AreEqual(2, SpawnManager.MaxPredatorsFor(0f), "two at most at the start");
+            int prev = 0;
+            for (float m = 0f; m <= 5000f; m += 100f)
+            {
+                int cap = SpawnManager.MaxPredatorsFor(m);
+                Assert.GreaterOrEqual(cap, prev, "the cap never shrinks with distance");
+                Assert.LessOrEqual(cap, 5, "never a swarm");
+                prev = cap;
+            }
+            Assert.AreEqual(2, SpawnManager.PiranhaSchoolSize(SpawnManager.PiranhaFromMeters));
+            Assert.AreEqual(3, SpawnManager.PiranhaSchoolSize(SpawnManager.PiranhaTrioFromMeters));
+
+            Assert.AreEqual(1.7f, SpawnManager.SpawnGapSeconds(0f), 1e-4f);
+            Assert.AreEqual(1.0f, SpawnManager.SpawnGapSeconds(1f), 1e-4f);
+            Assert.Greater(SpawnManager.SpawnGapSeconds(0.3f), SpawnManager.SpawnGapSeconds(0.7f), "denser as it gets harder");
+        }
+
         // --- Difficulty / regions ---
 
         [Test]

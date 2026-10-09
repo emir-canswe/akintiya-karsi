@@ -5,10 +5,11 @@ namespace Upstream.Data
     [CreateAssetMenu(fileName = "SpawnConfig", menuName = "Upstream/Spawn Config")]
     public class SpawnConfig : ScriptableObject
     {
-        [Header("Intervals")]
-        public float minSpawnInterval = 140f;
-        public float maxSpawnInterval = 215f;
-        public float intervalReductionPerDifficulty = 85f;
+        [Header("Spacing")]
+        /// <summary>Seconds between two spawn patterns at difficulty 0 (time-based, so a faster river doesn't crowd it).</summary>
+        public float spawnGapSecondsEasy = 1.7f;
+        /// <summary>Seconds between two spawn patterns at difficulty 1.</summary>
+        public float spawnGapSecondsHard = 1.0f;
 
         [Header("Food")]
         public int foodPerLineMin = 3;

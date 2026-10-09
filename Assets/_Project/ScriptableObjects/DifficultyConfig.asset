@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: df80a6d31c96ecc498f148b8ea39794d, type: 3}
   m_Name: DifficultyConfig
   m_EditorClassIdentifier: Upstream.Runtime::Upstream.Data.DifficultyConfig
-  difficultyRampDistance: 12000
-  startingDifficulty: 0.15
+  difficultyRampDistance: 30000
+  startingDifficulty: 0
   regions:
   - regionName: Mountain Creek
     startDistance: 0
