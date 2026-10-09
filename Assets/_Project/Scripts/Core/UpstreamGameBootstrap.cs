@@ -747,10 +747,11 @@ namespace Upstream.Core
             Image bg = panel.AddComponent<Image>();
             bg.sprite = roundSpr;
             bg.type = Image.Type.Sliced;
-            bg.color = new Color(1f, 1f, 1f, 0.16f); // frosted glass over the river, like the in-game coin pill
+            // See-through navy: dark enough for white words and colorful icons to read on the bright river.
+            bg.color = new Color(0.04f, 0.12f, 0.36f, 0.62f);
             bg.raycastTarget = false;
             var border = panel.AddComponent<Outline>();
-            border.effectColor = new Color(1f, 1f, 1f, 0.45f);
+            border.effectColor = new Color(1f, 1f, 1f, 0.3f);
             border.effectDistance = new Vector2(1.5f, -1.5f);
 
             // Heading tab sitting on the card's top edge
@@ -776,10 +777,19 @@ namespace Upstream.Core
             const float colW = 70f;
             var icons = new RectTransform[tips.Length];
             var labels = new TMP_Text[tips.Length];
+            var glows = new Image[tips.Length];
+            Sprite glowSpr = WatercolorSpriteFactory.GetCircleGlowSprite();
             Sprite arrow = CartoonSpriteFactory.GetPlayIcon();
             for (int i = 0; i < tips.Length; i++)
             {
                 float x = (i - (tips.Length - 1) * 0.5f) * colW;
+                // Warm glow behind the step whose turn it is (faded in by TipsAnimator)
+                GameObject glowObj = CreateUIRect($"TipGlow_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 9f), new Vector2(54f, 54f));
+                glows[i] = glowObj.AddComponent<Image>();
+                glows[i].sprite = glowSpr;
+                glows[i].color = new Color(1f, 0.82f, 0.3f, 0f);
+                glows[i].raycastTarget = false;
+
                 GameObject iconObj = CreateUIRect($"TipIcon_{i}", panel.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 9f), tips[i].size);
                 Image img = iconObj.AddComponent<Image>();
                 img.sprite = tips[i].icon;
@@ -802,12 +812,12 @@ namespace Upstream.Core
                     Image arrowImg = arrowObj.AddComponent<Image>();
                     arrowImg.sprite = arrow;
                     arrowImg.preserveAspect = true;
-                    arrowImg.color = new Color(1f, 1f, 1f, 0.55f);
+                    arrowImg.color = new Color(1f, 0.85f, 0.4f, 0.9f);
                     arrowImg.raycastTarget = false;
                 }
             }
 
-            panel.AddComponent<TipsAnimator>().Configure(icons, labels);
+            panel.AddComponent<TipsAnimator>().Configure(icons, labels, glows);
         }
 
         /// <summary>Round blue candy button with a white icon, anchored to the parent's top-right corner.</summary>

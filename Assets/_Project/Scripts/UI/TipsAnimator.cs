@@ -11,20 +11,19 @@ namespace Upstream.UI
     public class TipsAnimator : MonoBehaviour
     {
         private const float StepSeconds = 1.1f;
-        private const float DimAlpha = 0.6f;
+        private static readonly Color ActiveLabel = new Color(1f, 0.88f, 0.4f, 1f);
 
         private RectTransform[] icons;
-        private Image[] iconImages;
         private TMP_Text[] labels;
+        private Image[] glows;
         private float timer;
         private int current;
 
-        public void Configure(RectTransform[] tipIcons, TMP_Text[] tipLabels)
+        public void Configure(RectTransform[] tipIcons, TMP_Text[] tipLabels, Image[] tipGlows)
         {
             icons = tipIcons;
             labels = tipLabels;
-            iconImages = new Image[icons.Length];
-            for (int i = 0; i < icons.Length; i++) iconImages[i] = icons[i].GetComponent<Image>();
+            glows = tipGlows;
         }
 
         private void OnEnable()
@@ -53,9 +52,14 @@ namespace Upstream.UI
                 float s = on ? 1.12f + hop * 0.12f : 1f;
                 icons[i].localScale = new Vector3(s, s, 1f);
                 icons[i].anchoredPosition = new Vector2(icons[i].anchoredPosition.x, 9f + hop * 5f);
-                float a = on ? 1f : DimAlpha;
-                if (iconImages[i] != null) iconImages[i].color = new Color(1f, 1f, 1f, a);
-                if (labels[i] != null) labels[i].alpha = on ? 1f : 0.75f;
+                // Every step stays fully readable; the current one gets a warm glow and a yellow word.
+                if (glows != null && glows[i] != null)
+                {
+                    Color g = glows[i].color;
+                    g.a = on ? 0.55f * Mathf.Clamp01(t * 6f) * (1f - Mathf.Clamp01((t - 0.85f) * 6f)) : 0f;
+                    glows[i].color = g;
+                }
+                if (labels[i] != null) labels[i].color = on ? ActiveLabel : Color.white;
             }
         }
     }
