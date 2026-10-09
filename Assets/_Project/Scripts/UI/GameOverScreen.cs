@@ -26,6 +26,7 @@ namespace Upstream.UI
         [SerializeField] private ScoreSystem scoreSystem;
 
         private TMP_Text coinsEarnedText;
+        private TMP_Text goalText;
         private RectTransform card;
         private float cardHeightWithContinue;
         private float cardHeightWithoutContinue;
@@ -67,6 +68,9 @@ namespace Upstream.UI
             menuButton = menuBtn;
             BindButtons();
         }
+
+        /// <summary>"N more coins for the next fish" line: gives every run a goal.</summary>
+        public void SetGoalText(TMP_Text label) => goalText = label;
 
         /// <summary>Card to pop in and resize (taller when the continue button is offered).</summary>
         public void SetCard(RectTransform cardRect, float heightWithContinue, float heightWithoutContinue)
@@ -163,6 +167,14 @@ namespace Upstream.UI
             if (newBestBadge != null) newBestBadge.SetActive(isNewBest);
             if (bestScoreText != null) bestScoreText.text = LocalizationManager.Format("best_score", best);
             if (coinsEarnedText != null) coinsEarnedText.text = LocalizationManager.Format("coins_earned", gm != null ? gm.LastRunCoins : 0);
+            if (goalText != null)
+            {
+                var save = SaveSystem.Load();
+                var next = FishShop.NextGoal(save);
+                if (next == null) goalText.text = LocalizationManager.Get("all_fish_owned");
+                else if (save.coins >= next.price) goalText.text = LocalizationManager.Format("can_buy_fish", next.Name);
+                else goalText.text = string.Format(LocalizationManager.Get("next_fish_goal"), next.Name, next.price - save.coins);
+            }
 
             if (unlockNoteText != null)
             {

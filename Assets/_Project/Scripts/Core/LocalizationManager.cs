@@ -108,6 +108,9 @@ namespace Upstream.Core
             { "perk_coin", new Entry("+%{0} para", "+{0}% coins") },
             { "perk_heart", new Entry("+1 can", "+1 heart") },
             { "perk_none", new Entry("Başlangıç balığı", "Starter fish") },
+            { "next_fish_goal", new Entry("{0} için {1} para daha!", "{1} more coins for {0}!") },
+            { "can_buy_fish", new Entry("{0} alabilirsin!", "You can buy {0}!") },
+            { "all_fish_owned", new Entry("Tüm balıklar sende!", "You own every fish!") },
             { "coins_earned", new Entry("+{0} para", "+{0} coins") },
             { "menu_btn", new Entry("Ana Menü", "Main Menu") },
         };

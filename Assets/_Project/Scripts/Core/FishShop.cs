@@ -41,6 +41,25 @@ namespace Upstream.Core
             return true;
         }
 
+        /// <summary>The cheapest fish not owned yet (the player's next goal), or null when all are owned.</summary>
+        public static FishDef NextGoal(SaveData save)
+        {
+            FishDef best = null;
+            foreach (var fish in FishCatalog.All)
+            {
+                if (Owns(save, fish.id)) continue;
+                if (best == null || fish.price < best.price) best = fish;
+            }
+            return best;
+        }
+
+        public static int OwnedCount(SaveData save)
+        {
+            int n = 0;
+            foreach (var fish in FishCatalog.All) if (Owns(save, fish.id)) n++;
+            return n;
+        }
+
         /// <summary>Coins a run pays: pickups + distance, multiplied by the equipped fish's bonus.</summary>
         public static int RunReward(int pickupCoins, int meters, float coinBonus)
         {

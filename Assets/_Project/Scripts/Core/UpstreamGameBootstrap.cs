@@ -464,7 +464,7 @@ namespace Upstream.Core
             CanvasGroup overCg = overObj.AddComponent<CanvasGroup>();
 
             // Card: GameOverScreen shrinks it when the continue button isn't offered.
-            GameObject cardObj = CreateUIRect("Card", overObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(300f, 340f));
+            GameObject cardObj = CreateUIRect("Card", overObj.transform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(300f, 366f));
             Image cardBg = cardObj.AddComponent<Image>();
             cardBg.sprite = roundSpr;
             cardBg.type = Image.Type.Sliced;
@@ -500,6 +500,14 @@ namespace Upstream.Core
             TMP_Text coinsEarned = CreateStatPill("CoinsPill", cardObj.transform, new Vector2(72f, -174f), WatercolorSpriteFactory.GetCoinSprite());
             coinsEarned.color = new Color(1f, 0.88f, 0.35f, 1f);
 
+            // Next goal: "240 more coins for Redfin" / "You can buy Redfin!"
+            TMP_Text goalText = CreateLabel("Goal", cardObj.transform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -210f), new Vector2(276f, 22f), "", 13f, TextAlignmentOptions.Center, FontStyles.Bold);
+            goalText.color = new Color(0.75f, 1f, 0.8f, 1f);
+            goalText.enableAutoSizing = true;
+            goalText.fontSizeMin = 9f;
+            goalText.fontSizeMax = 13f;
+            SetOutline(goalText, 0.25f);
+
             // "NEW BEST!" sticker hanging off the card's top-right corner
             GameObject badgeObj = CreateUIRect("NewBestBadge", cardObj.transform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-16f, -58f), new Vector2(108f, 32f));
             badgeObj.transform.localRotation = Quaternion.Euler(0f, 0f, -12f);
@@ -529,7 +537,8 @@ namespace Upstream.Core
             GameOverScreen gameOverScreen = overObj.AddComponent<GameOverScreen>();
             gameOverScreen.Configure(finalScoreText, bestText, badgeObj, againBtn, contBtn, contLabel, unlockNote, overCg, scoreSystem, adsService);
             gameOverScreen.SetCoinsAndMenu(coinsEarned, menuBtn);
-            gameOverScreen.SetCard((RectTransform)cardObj.transform, 340f, 288f);
+            gameOverScreen.SetGoalText(goalText);
+            gameOverScreen.SetCard((RectTransform)cardObj.transform, 366f, 314f);
             overObj.SetActive(false);
 
             // --- PAUSE OVERLAY (app backgrounded / back button) ---
@@ -795,6 +804,16 @@ namespace Upstream.Core
             balanceText.color = gold;
             SetOutline(balanceText, 0.25f);
 
+            GameObject collectionObj = CreateUIRect("Collection", c, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-24f, -28f), new Vector2(96f, 36f));
+            Image collectionBg = collectionObj.AddComponent<Image>();
+            collectionBg.sprite = roundSpr;
+            collectionBg.type = Image.Type.Sliced;
+            collectionBg.color = new Color(0.04f, 0.10f, 0.35f, 0.7f);
+            GameObject collectionIcon = CreateUIRect("Icon", collectionObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(15f, 22f));
+            collectionIcon.AddComponent<Image>().sprite = FishSkinFactory.GetBody(FishCatalog.Get(FishCatalog.StarterId));
+            TMP_Text collectionText = CreateLabel("Count", collectionObj.transform, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(58f, 0f), new Vector2(64f, 28f), "", 16f, TextAlignmentOptions.Center, FontStyles.Bold);
+            SetOutline(collectionText, 0.25f);
+
             // Display card: the selected fish swims in its own little aquarium
             GameObject detail = CreateUIRect("Detail", c, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -190f), new Vector2(304f, 236f));
             Image detailBg = detail.AddComponent<Image>();
@@ -934,6 +953,7 @@ namespace Upstream.Core
             FishShopScreen screen = root.AddComponent<FishShopScreen>();
             screen.Configure(bigPreview, nameText, rarityText, perkText, action, balanceText, cards, close);
             screen.SetDecor(rarityPill, previewGlow, sunlight);
+            screen.SetCollectionText(collectionText);
             root.SetActive(false);
             return screen;
         }

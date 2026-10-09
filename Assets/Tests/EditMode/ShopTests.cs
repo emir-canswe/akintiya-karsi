@@ -102,6 +102,23 @@ namespace Upstream.Tests
             Assert.IsTrue(FishShop.Owns(save, FishCatalog.StarterId));
         }
 
+        [Test]
+        public void NextGoal_IsTheCheapestFishNotOwned()
+        {
+            var save = new SaveData();
+            FishDef first = FishShop.NextGoal(save);
+            Assert.IsNotNull(first);
+            foreach (var fish in FishCatalog.All)
+                if (fish.id != FishCatalog.StarterId) Assert.LessOrEqual(first.price, fish.price);
+
+            save.ownedFish.Add(first.id);
+            Assert.AreNotEqual(first.id, FishShop.NextGoal(save).id, "Owned fish is no longer the goal.");
+            Assert.AreEqual(2, FishShop.OwnedCount(save));
+
+            foreach (var fish in FishCatalog.All) if (!save.ownedFish.Contains(fish.id)) save.ownedFish.Add(fish.id);
+            Assert.IsNull(FishShop.NextGoal(save), "No goal once every fish is owned.");
+        }
+
         // --- Rewards ---
 
         [Test]

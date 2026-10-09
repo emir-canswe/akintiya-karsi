@@ -48,6 +48,10 @@ namespace Upstream.UI
         private Image rarityPill;
         private Image previewGlow;
         private RawImage sunlight;
+        private TMP_Text collectionText;
+
+        /// <summary>"owned / total" counter in the header.</summary>
+        public void SetCollectionText(TMP_Text label) => collectionText = label;
 
         private int selectedId;
         private float popTime = 1f;
@@ -163,6 +167,7 @@ namespace Upstream.UI
             bool equipped = save.equippedFish == fish.id;
 
             if (balanceText != null) balanceText.text = save.coins.ToString();
+            if (collectionText != null) collectionText.text = $"{FishShop.OwnedCount(save)}/{FishCatalog.Count}";
 
             // Detail panel
             bigPreview.SetFish(fish);
