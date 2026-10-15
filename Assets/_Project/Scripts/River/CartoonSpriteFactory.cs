@@ -803,42 +803,72 @@ namespace Upstream.River
             return s;
         }
 
-        /// <summary>Shiny hook with a wiggly pink worm (the bait that hides the danger).</summary>
+        /// <summary>
+        /// World-unit distance from a hook sprite's center up to the eye where the fishing line is tied
+        /// (the sprite is 64 px tall and drawn at 1.39 px per unit).
+        /// </summary>
+        public const float HookEyeOffset = 17f;
+
+        /// <summary>
+        /// Polished steel J-hook with a tied-on eye, a sharp barbed point and a plump segmented pink worm
+        /// wrapped around the shank (the bait that hides the danger). Drawn at double resolution.
+        /// </summary>
         public static Sprite GetHook()
         {
             if (hook != null) return hook;
-            const int w = 40, h = 48;
-            Vector2 c = new Vector2(20f, 24f);
-            Color metal = Hex("#DDE6F0"), metalDark = Hex("#8E9BB0"), worm = Hex("#FF7FAE"), wormSeg = Hex("#E0558C");
-            Color outline = Hex("#2B2F45");
+            const int w = 40, h = 64;
+            const float sx = 28f, bendY = 18f, bendR = 10f, wire = 2.6f;
+            Vector2 bendC = new Vector2(sx - bendR, bendY);
+            Vector2 eye = new Vector2(sx, 58f);
+            Vector2 pointBase = new Vector2(sx - 2f * bendR, bendY), pointTip = new Vector2(sx - 2f * bendR, 32f);
+            Vector2 barbA = new Vector2(pointBase.x + 0.4f, 27f), barbB = new Vector2(pointBase.x + 5f, 23.5f);
+            const float wormLo = 25f, wormHi = 45f, wormR = 4.3f;
+            Color outline = Hex("#1B2236");
+            Color wormLight = Hex("#FFA9C7"), wormBase = Hex("#FF7FAE"), wormDark = Hex("#D9457F"), wormRim = Hex("#A8346A");
 
-            float Shaft(Vector2 p) => SdBox(p, c + new Vector2(2f, 6f), new Vector2(2f, 14f), 2f);
-            float Curve(Vector2 p)
+            float Segment(Vector2 p, Vector2 a, Vector2 b, float ra, float rb)
             {
-                Vector2 cc = c + new Vector2(-4f, -8f);
-                float ring = Mathf.Abs((p - cc).magnitude - 6f) - 2f;
-                return p.y > cc.y + 1f && p.x < cc.x + 5f ? Mathf.Max(ring, p.y - (cc.y + 1f)) : ring;
+                Vector2 ab = b - a;
+                float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+                return (p - (a + ab * t)).magnitude - Mathf.Lerp(ra, rb, t);
             }
-            float Eye(Vector2 p) => Mathf.Abs((p - (c + new Vector2(2f, 21f))).magnitude - 3f) - 1.3f;
+            float Eye(Vector2 p) => Mathf.Abs((p - eye).magnitude - 3.3f) - 1.6f;
+            float Shank(Vector2 p) => Segment(p, new Vector2(sx, bendY), new Vector2(sx, 55f), wire, wire);
+            float Bend(Vector2 p) => p.y <= bendY ? Mathf.Abs((p - bendC).magnitude - bendR) - wire : 99f;
+            float Point(Vector2 p) => Segment(p, pointBase, pointTip, wire, 0.6f);
+            float Barb(Vector2 p) => Segment(p, barbA, barbB, 1.3f, 0.3f);
+            float Steel(Vector2 p) => Mathf.Min(Mathf.Min(SmoothMin(Eye(p), Shank(p), 1.5f), Bend(p)), Mathf.Min(Point(p), Barb(p)));
+            float WormX(float y) => sx + Mathf.Sin(y * 0.5f) * 2.4f;
             float Worm(Vector2 p)
             {
-                Vector2 q = p - (c + new Vector2(2f, 2f));
-                float wx = Mathf.Sin(q.y * 0.45f) * 4f;
-                return SdBox(new Vector2(q.x - wx, q.y), Vector2.zero, new Vector2(3.6f, 9f), 3.6f);
+                float yc = Mathf.Clamp(p.y, wormLo, wormHi);
+                float taper = 1f - 0.25f * Mathf.Abs(yc - (wormLo + wormHi) * 0.5f) / ((wormHi - wormLo) * 0.5f);
+                return (p - new Vector2(WormX(yc), yc)).magnitude - wormR * taper;
             }
 
-            Sdf sdf = p => Mathf.Min(Mathf.Min(Shaft(p), Curve(p)), Mathf.Min(Eye(p), Worm(p)));
+            Sdf sdf = p => Mathf.Min(Steel(p), Worm(p));
             Fill fill = (p, d) =>
             {
-                if (Worm(p) < 0f)
+                float wd = Worm(p);
+                if (wd < 0f && wd <= Steel(p))
                 {
-                    Vector2 q = p - (c + new Vector2(2f, 2f));
-                    Color col = Mathf.Abs(Frac(q.y / 3.2f) - 0.5f) < 0.12f ? wormSeg : worm;
-                    return Shine(col, p, c + new Vector2(0f, 6f), 3f, 0.5f);
+                    float side = Mathf.Clamp((p.x - WormX(Mathf.Clamp(p.y, wormLo, wormHi))) / wormR, -1f, 1f);
+                    Color col = Color.Lerp(wormLight, wormDark, Mathf.Clamp01(0.5f + side * 0.6f));
+                    col = Color.Lerp(col, wormBase, 0.35f);
+                    if (Frac((p.y - wormLo) / 3.3f) < 0.2f) col = Color.Lerp(col, wormDark, 0.75f);
+                    if (wd > -0.9f) col = Color.Lerp(col, wormRim, 0.6f);
+                    float streak = Mathf.Exp(-Mathf.Pow((side + 0.45f) / 0.18f, 2f));
+                    return Color.Lerp(col, Color.white, streak * 0.55f);
                 }
-                return p.x < c.x + 1f ? metal : metalDark;
+                // Polished steel: dark edges, bright core lit from the top left, a hard white glint
+                float depth = Mathf.Clamp01(-d / wire);
+                float lit = Light(p, new Vector2(20f, 34f), 24f);
+                float tone = 0.32f + 0.5f * lit + 0.3f * depth;
+                Color steel = Color.Lerp(Hex("#56637D"), Hex("#EEF4FC"), Mathf.Clamp01(tone));
+                if (depth > 0.45f && lit > 0.6f) steel = Color.Lerp(steel, Color.white, Mathf.Clamp01((lit - 0.6f) * 2.6f));
+                return steel;
             };
-            hook = ToSprite(Paint(w, h, sdf, fill, outline, 1.4f), new Vector2(0.5f, 0.5f), 1.15f);
+            hook = ToSprite(PaintHi(w, h, 2, sdf, fill, outline, 1.0f), new Vector2(0.5f, 34f / h), 1.39f * 2f);
             return hook;
         }
 

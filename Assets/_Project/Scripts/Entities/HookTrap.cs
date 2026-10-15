@@ -65,7 +65,7 @@ namespace Upstream.Entities
                 lineShown = show;
                 fishingLine.enabled = show;
             }
-            if (show) fishingLine.SetPosition(1, new Vector3(hookPos.x, hookPos.y + 12f, 0.1f));
+            if (show) fishingLine.SetPosition(1, new Vector3(hookPos.x, hookPos.y + Upstream.River.CartoonSpriteFactory.HookEyeOffset, 0.1f));
         }
     }
 }
