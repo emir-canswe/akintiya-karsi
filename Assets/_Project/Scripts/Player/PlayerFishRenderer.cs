@@ -31,6 +31,16 @@ namespace Upstream.Player
         private float stagePopScale;
         private FishDef skin;
 
+        // What was last written to the renderers: a SpriteRenderer setter is a native call that marks the sprite
+        // dirty even when the value is unchanged, so Update only writes on a change.
+        private Color shownTint = Color.white;
+        private Color shownAura = Color.clear;
+        private bool auraShown;
+        private bool partsHidden;
+        private bool shieldShown;
+        private Color shownShield;
+        private float shownShieldScale = 2.9f;
+
         private void Awake()
         {
             playerController = GetComponent<PlayerController>();
@@ -46,6 +56,7 @@ namespace Upstream.Player
         {
             GameEvents.OnGrowthStageChanged += HandleStageChanged;
             GameEvents.OnSharkEaten += HandleSharkEaten;
+            GameEvents.OnTurboSmash += HandleTurboSmash;
             FishShop.OnFishEquipped += ApplySkin;
         }
 
@@ -53,6 +64,7 @@ namespace Upstream.Player
         {
             GameEvents.OnGrowthStageChanged -= HandleStageChanged;
             GameEvents.OnSharkEaten -= HandleSharkEaten;
+            GameEvents.OnTurboSmash -= HandleTurboSmash;
             FishShop.OnFishEquipped -= ApplySkin;
         }
 
@@ -89,6 +101,12 @@ namespace Upstream.Player
             stagePopScale = 0.55f;
         }
 
+        /// <summary>The fish bulges on impact when it bursts through something at turbo speed.</summary>
+        private void HandleTurboSmash()
+        {
+            stagePopScale = Mathf.Max(stagePopScale, 0.3f);
+        }
+
         private void BuildFishHierarchy()
         {
             if (visualRoot != null) return;
@@ -105,6 +123,7 @@ namespace Upstream.Player
             auraRenderer.sprite = WatercolorSpriteFactory.GetCircleGlowSprite();
             auraRenderer.sortingOrder = 8;
             auraRenderer.color = Color.clear;
+            auraRenderer.enabled = false; // a fully transparent glow would still cost a draw call and fill rate
 
             // Soft drop shadow on the water (sprites are assigned by ApplySkin)
             GameObject shadowObj = new GameObject("Shadow");
@@ -157,6 +176,10 @@ namespace Upstream.Player
             if (visualRoot == null) return;
 
             GameState state = GameManager.Instance != null ? GameManager.Instance.CurrentState : GameState.Menu;
+            // The menu has its own mascot; the run fish waiting at its start spot would peek out between the buttons.
+            bool shown = state != GameState.Menu;
+            if (visualRoot.gameObject.activeSelf != shown) visualRoot.gameObject.SetActive(shown);
+            if (!shown) return;
             bool isTurbo = turboSystem != null && turboSystem.IsTurboActive;
             bool isInvincible = healthSystem != null && healthSystem.IsInvincible;
             int stage = growthSystem != null ? growthSystem.CurrentStage : 0;
@@ -190,56 +213,90 @@ namespace Upstream.Player
             {
                 stageTint = new Color(1f, 0.92f, 0.80f, 1f);
             }
-            bodyRenderer.color = stageTint;
-            tailRenderer.color = stageTint;
+            if (stageTint != shownTint)
+            {
+                shownTint = stageTint;
+                bodyRenderer.color = stageTint;
+                tailRenderer.color = stageTint;
+            }
 
             // Aura glow
+            Color aura;
             if (isTurbo)
             {
                 float pulse = 0.55f + 0.25f * Mathf.Sin(Time.time * 18f);
-                auraRenderer.color = new Color(0.55f, 0.98f, 0.86f, pulse);
+                aura = new Color(0.55f, 0.98f, 0.86f, pulse);
             }
             else if (stage >= 2)
             {
                 // Subtle golden aura showing shark-eating power
                 float pulse = 0.18f + 0.10f * Mathf.Sin(Time.time * 6f);
-                auraRenderer.color = new Color(1f, 0.84f, 0.35f, pulse);
+                aura = new Color(1f, 0.84f, 0.35f, pulse);
             }
             else if (skin != null && skin.pattern == FishPattern.Rainbow)
             {
                 // Rainbow Legend: aura cycles through every hue.
-                Color hue = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.25f, 1f), 0.55f, 1f);
-                hue.a = skin.glow.a * (0.8f + 0.2f * Mathf.Sin(Time.time * 5f));
-                auraRenderer.color = hue;
+                aura = Color.HSVToRGB(Mathf.Repeat(Time.time * 0.25f, 1f), 0.55f, 1f);
+                aura.a = skin.glow.a * (0.8f + 0.2f * Mathf.Sin(Time.time * 5f));
             }
             else if (skin != null && skin.glow.a > 0f)
             {
-                Color glow = skin.glow;
-                glow.a *= 0.8f + 0.2f * Mathf.Sin(Time.time * 4f);
-                auraRenderer.color = glow;
+                aura = skin.glow;
+                aura.a *= 0.8f + 0.2f * Mathf.Sin(Time.time * 4f);
             }
             else
             {
-                auraRenderer.color = Color.clear;
+                aura = Color.clear;
+            }
+
+            // Most fish have no glow at all: then the aura sprite is switched off instead of drawn invisibly.
+            bool auraVisible = aura.a > 0.004f;
+            if (auraVisible != auraShown)
+            {
+                auraShown = auraVisible;
+                auraRenderer.enabled = auraVisible;
+            }
+            if (auraVisible && aura != shownAura)
+            {
+                shownAura = aura;
+                auraRenderer.color = aura;
             }
 
             // Invincibility / Dying blink
             bool blinkHide = (isInvincible && !isTurbo && Mathf.FloorToInt(Time.time * 14f) % 2 == 0) ||
                              (state == GameState.Dying && Mathf.FloorToInt(Time.time * 8f) % 2 == 0);
-            bodyRenderer.enabled = !blinkHide;
-            tailRenderer.enabled = !blinkHide;
-            leftFinRenderer.enabled = !blinkHide;
-            rightFinRenderer.enabled = !blinkHide;
-            shadowRenderer.enabled = !blinkHide;
+            if (blinkHide != partsHidden)
+            {
+                partsHidden = blinkHide;
+                bodyRenderer.enabled = !blinkHide;
+                tailRenderer.enabled = !blinkHide;
+                leftFinRenderer.enabled = !blinkHide;
+                rightFinRenderer.enabled = !blinkHide;
+                shadowRenderer.enabled = !blinkHide;
+            }
 
             // Shield bubble: gently pulsing while charged
             bool shielded = healthSystem != null && healthSystem.ShieldCharges > 0;
-            shieldRenderer.enabled = shielded;
+            if (shielded != shieldShown)
+            {
+                shieldShown = shielded;
+                shieldRenderer.enabled = shielded;
+            }
             if (shielded)
             {
                 float pulse = 0.55f + 0.2f * Mathf.Sin(Time.time * 4f);
-                shieldRenderer.color = new Color(0.55f, 0.95f, 1f, pulse);
-                shieldRenderer.transform.localScale = Vector3.one * (2.9f + 0.1f * Mathf.Sin(Time.time * 3f));
+                Color shield = new Color(0.55f, 0.95f, 1f, pulse);
+                if (shield != shownShield)
+                {
+                    shownShield = shield;
+                    shieldRenderer.color = shield;
+                }
+                float shieldScale = 2.9f + 0.1f * Mathf.Sin(Time.time * 3f);
+                if (!Mathf.Approximately(shieldScale, shownShieldScale))
+                {
+                    shownShieldScale = shieldScale;
+                    shieldRenderer.transform.localScale = Vector3.one * shieldScale;
+                }
             }
         }
     }

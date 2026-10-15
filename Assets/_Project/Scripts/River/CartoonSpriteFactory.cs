@@ -14,7 +14,7 @@ namespace Upstream.River
         private delegate Color Fill(Vector2 p, float d);
 
         private static Sprite shrimp, star, rock, log, hook, heart, bubble, glint, sparkle;
-        private static Sprite caustics, grassTile, shoreTile, waterGlow;
+        private static Sprite caustics, grassTile, shoreTile, waterGlow, edgeGradient, flowStreaks, lightRay;
         private static Sprite tree, flowerBush, mushroom, stone, lilyPad;
         private static Sprite barFill, homeIcon, playIcon, pauseIcon, wave, closeIcon, dragIcon, bigWave, foamStrip;
 
@@ -99,6 +99,29 @@ namespace Upstream.River
             return tex;
         }
 
+        /// <summary>
+        /// Same as <see cref="Paint"/> but renders at <paramref name="scale"/> times the pixels: the shape and fill
+        /// are still written in the original coordinates, so the sprite is just crisper (use ppu * scale).
+        /// </summary>
+        private static Texture2D PaintHi(int w, int h, int scale, Sdf sdf, Fill fill, Color outline, float outlineWidth)
+        {
+            float k = scale;
+            return Paint(w * scale, h * scale, p => sdf(p / k) * k, (p, d) => fill(p / k, d / k), outline, outlineWidth * k);
+        }
+
+        /// <summary>Volume for a body seen from above: lit dome, glossy streak, cool rim light.</summary>
+        private static Color DomeLight(Color col, float across, float side, float t)
+        {
+            float z = Mathf.Sqrt(Mathf.Max(0f, 1f - side * side));
+            float lambert = Mathf.Max(0f, Vector3.Dot(new Vector3(side, 0.1f, z).normalized, new Vector3(-0.55f, 0.2f, 0.8f).normalized));
+            col = new Color(col.r * (0.72f + 0.5f * lambert), col.g * (0.72f + 0.5f * lambert), col.b * (0.74f + 0.48f * lambert), col.a);
+            float rim = Smooth(0.7f, 0.98f, Mathf.Abs(side)) * Smooth(-0.1f, 0.6f, side);
+            col = Color.Lerp(col, new Color(0.7f, 0.95f, 1f, 1f), rim * 0.4f);
+            float gx = (side + 0.42f) / 0.16f;
+            float streak = Mathf.Exp(-gx * gx) * Smooth(0.08f, 0.3f, t) * Smooth(0.85f, 0.55f, t);
+            return Color.Lerp(col, Color.white, streak * 0.38f);
+        }
+
         private static Sprite ToSprite(Texture2D tex, Vector2 pivot, float ppu) =>
             Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, ppu);
 
@@ -115,6 +138,22 @@ namespace Upstream.River
             return Color.Lerp(c, Color.white, s * s * strength);
         }
 
+        /// <summary>
+        /// Paints the art that otherwise appears for the first time in the middle of a run (the other predators,
+        /// the big waves): painting takes a few milliseconds on a phone, which would show as a hitch the moment
+        /// the first piranha, pike, catfish or set of big waves shows up. Called once while the game is built.
+        /// </summary>
+        public static void PrewarmGameplayArt()
+        {
+            foreach (Data.PredatorKind kind in System.Enum.GetValues(typeof(Data.PredatorKind)))
+            {
+                GetPredatorBody(kind);
+                GetPredatorTail(kind);
+            }
+            GetBigWave();
+            GetFoamStrip();
+        }
+
         // ------------------------------------------------------------------ pickups
 
         /// <summary>Curled coral shrimp with an eye, segments and antennae, on a soft light halo.</summary>
@@ -123,7 +162,7 @@ namespace Upstream.River
             if (shrimp != null) return shrimp;
             const int s = 44;
             Vector2 c = new Vector2(22f, 21f);
-            Color body = Hex("#FF8A65"), belly = Hex("#FFC6A8"), seg = Hex("#E8603F"), outline = Hex("#9C2F1E");
+            Color body = Hex("#FF7A55"), belly = Hex("#FFD2B0"), seg = Hex("#E8402B"), outline = Hex("#8E2418");
 
             // Body: circles along a C-shaped arc, thick at the head, thin at the tail.
             const int n = 9;
@@ -160,13 +199,13 @@ namespace Upstream.River
                 return Shine(col, p, head + new Vector2(-2f, 3f), 4f, 0.6f);
             };
 
-            Texture2D tex = Paint(s, s, sdf, fill, outline, 1.6f);
-            // Halo + antennae painted over the clear background
-            for (int y = 0; y < s; y++)
+            Texture2D tex = PaintHi(s, s, 2, sdf, fill, outline, 1.6f);
+            // Halo + antennae painted over the clear background (the texture is 2x, shapes stay in 1x units)
+            for (int y = 0; y < s * 2; y++)
             {
-                for (int x = 0; x < s; x++)
+                for (int x = 0; x < s * 2; x++)
                 {
-                    Vector2 p = new Vector2(x + 0.5f, y + 0.5f);
+                    Vector2 p = new Vector2((x + 0.5f) / 2f, (y + 0.5f) / 2f);
                     Color cur = tex.GetPixel(x, y);
                     // Antennae: two thin arcs from the head
                     for (int k = -1; k <= 1; k += 2)
@@ -189,7 +228,7 @@ namespace Upstream.River
                 }
             }
             tex.Apply();
-            shrimp = ToSprite(tex, new Vector2(0.5f, 0.5f), 1.15f);
+            shrimp = ToSprite(tex, new Vector2(0.5f, 0.5f), 1.15f * 2f);
             return shrimp;
         }
 
@@ -660,7 +699,7 @@ namespace Upstream.River
                     {
                         Vector2 eye = new Vector2(c.x + HalfWidth(sp.eyeT) * 0.62f * k, BodyY(sp.eyeT));
                         float e = SdEllipse(p, eye, new Vector2(2.6f, 3.1f) * sp.eyeSize);
-                        if (e < 0f) col = Hex("#0B1426");
+                        if (e < 0f) col = e < -1.1f * sp.eyeSize ? Hex("#0B1426") : (kind == Data.PredatorKind.Shark ? Hex("#2A3F63") : Hex("#FFB726"));
                         if ((p - (eye + new Vector2(-0.8f * k, 0.9f) * sp.eyeSize)).magnitude < 0.75f * sp.eyeSize) col = Color.white;
                         if (sp.brows)
                         {
@@ -672,9 +711,11 @@ namespace Upstream.River
                         else if (e > 0f && e < 1.4f && p.y > eye.y) col = Color.Lerp(col, sp.spine, 0.5f);
                     }
                 }
+                if (Body(p) <= 0f)
+                    col = DomeLight(col, across, Mathf.Clamp((p.x - c.x) / hw, -1f, 1f), t);
                 return Shine(col, p, new Vector2(c.x - sp.halfWidth * 0.3f, c.y + 10f), sp.halfWidth * 0.6f, 0.25f);
             };
-            Sprite s = ToSprite(Paint(w, h, sdf, fill, sp.outline, 2.1f), new Vector2(0.5f, 0.46f), 1.15f);
+            Sprite s = ToSprite(PaintHi(w, h, 2, sdf, fill, sp.outline, 2.1f), new Vector2(0.5f, 0.46f), 1.15f * 2f);
             predatorBodies[kind] = s;
             return s;
         }
@@ -698,7 +739,7 @@ namespace Upstream.River
                 return SmoothMin(stalk, SmoothMin(l, r, 6f), 9f) * k;
             };
             Fill fill = (p, d) => p.x < b.x ? sp.finLit : sp.finDark;
-            Sprite s = ToSprite(Paint(w, h, sdf, fill, sp.outline, 2.1f), new Vector2(0.5f, b.y / h), 1.15f);
+            Sprite s = ToSprite(PaintHi(w, h, 2, sdf, fill, sp.outline, 2.1f), new Vector2(0.5f, b.y / h), 1.15f * 2f);
             predatorTails[kind] = s;
             return s;
         }
@@ -980,6 +1021,86 @@ namespace Upstream.River
             tex.Apply();
             waterGlow = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
             return waterGlow;
+        }
+
+        /// <summary>Soft horizontal falloff: alpha 1 at the left edge fading to 0 (flip it for the right bank). Used for shallows and the contact shadow.</summary>
+        public static Sprite GetEdgeGradient()
+        {
+            if (edgeGradient != null) return edgeGradient;
+            const int w = 64, h = 4;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float t = (x + 0.5f) / w;
+                    float a = Mathf.Pow(1f - t, 1.7f);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            tex.Apply();
+            edgeGradient = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
+            return edgeGradient;
+        }
+
+        /// <summary>Long soft streaks of lighter water. Seamless in both directions; 128x128 world units.</summary>
+        public static Sprite GetFlowStreaks()
+        {
+            if (flowStreaks != null) return flowStreaks;
+            const int s = 192;            // texels; the tile covers 128 world units (ppu 1.5)
+            const int n = 16;
+            var cx = new float[n]; var cy = new float[n]; var lx = new float[n]; var ly = new float[n]; var tilt = new float[n]; var gain = new float[n];
+            for (int i = 0; i < n; i++)
+            {
+                cx[i] = Hash(i, 1.7f); cy[i] = Hash(i, 5.3f);
+                lx[i] = Mathf.Lerp(0.006f, 0.014f, Hash(i, 9.1f));
+                ly[i] = Mathf.Lerp(0.07f, 0.2f, Hash(i, 13.7f));
+                tilt[i] = (Hash(i, 17.9f) - 0.5f) * 0.10f;
+                gain[i] = Mathf.Lerp(0.5f, 1f, Hash(i, 21.3f));
+            }
+            var px = new Color[s * s];
+            for (int y = 0; y < s; y++)
+            {
+                float v = (y + 0.5f) / s;
+                for (int x = 0; x < s; x++)
+                {
+                    float u = (x + 0.5f) / s;
+                    float a = 0f;
+                    for (int i = 0; i < n; i++)
+                    {
+                        float dy = v - cy[i]; dy -= Mathf.Round(dy);
+                        if (Mathf.Abs(dy) > ly[i] * 2.4f) continue;
+                        float dx = u - cx[i]; dx -= Mathf.Round(dx);
+                        dx += dy * tilt[i];
+                        float e = dx * dx / (lx[i] * lx[i]) + dy * dy / (ly[i] * ly[i]);
+                        if (e > 6f) continue;
+                        a = Mathf.Max(a, Mathf.Exp(-e) * gain[i]);
+                    }
+                    px[y * s + x] = new Color(1f, 1f, 1f, a);
+                }
+            }
+            var tex = new Texture2D(s, s, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat };
+            tex.SetPixels(px);
+            tex.Apply();
+            flowStreaks = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 1.5f, 0, SpriteMeshType.FullRect);
+            return flowStreaks;
+        }
+
+        /// <summary>One soft vertical shaft of sunlight (alpha bell across, fading out at both ends). 32x256.</summary>
+        public static Sprite GetLightRay()
+        {
+            if (lightRay != null) return lightRay;
+            const int w = 32, h = 256;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    float across = Mathf.Abs((x + 0.5f) / w - 0.5f) * 2f;
+                    float along = (y + 0.5f) / h;
+                    float a = (1f - Smooth(0f, 1f, across)) * Smooth(0f, 0.2f, along) * Smooth(1f, 0.6f, along);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
+                }
+            tex.Apply();
+            lightRay = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1f, 0, SpriteMeshType.FullRect);
+            return lightRay;
         }
 
         /// <summary>Lush grass with lighter/darker tufts and tiny flowers. Seamless; 128x128 world units at 2x resolution.</summary>

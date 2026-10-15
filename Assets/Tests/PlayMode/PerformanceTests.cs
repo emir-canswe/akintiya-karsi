@@ -101,5 +101,51 @@ namespace Upstream.Tests
             Assert.Greater(frames, 100, "The run should keep going while invincible.");
             Assert.Less(avg, 256f, "Game scripts allocate garbage every frame (causes GC hitches on phones).");
         }
+
+        /// <summary>
+        /// Reports how many batches (draw calls after batching) a busy late-game frame needs and how long the
+        /// game's own Update work takes. Informational: the numbers are logged, a loose ceiling guards against
+        /// the sprite batching breaking down completely.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator BusyRun_ReportsBatchesAndScriptTime()
+        {
+            yield return null;
+            yield return null;
+
+            var gm = GameManager.Instance;
+            Assert.IsNotNull(gm);
+            var health = Object.FindFirstObjectByType<HealthSystem>(FindObjectsInactive.Include);
+
+            gm.StartGame();
+            gm.CurrentDistance = 25000f;
+
+            using (var batches = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Batches Count"))
+            using (var drawCalls = Unity.Profiling.ProfilerRecorder.StartNew(Unity.Profiling.ProfilerCategory.Render, "Draw Calls Count"))
+            {
+                for (int i = 0; i < 120; i++)
+                {
+                    health.SetInvincible(10f);
+                    yield return null;
+                }
+
+                long maxBatches = 0, sumBatches = 0, maxDraws = 0;
+                int samples = 0;
+                for (int i = 0; i < 240 && gm.CurrentState == GameState.Playing; i++)
+                {
+                    health.SetInvincible(10f);
+                    yield return null; // (WaitForEndOfFrame isn't evoked in batch mode); the recorder holds the last rendered frame
+                    if (!batches.Valid) break;
+                    long b = batches.LastValue, d = drawCalls.Valid ? drawCalls.LastValue : 0;
+                    maxBatches = System.Math.Max(maxBatches, b);
+                    maxDraws = System.Math.Max(maxDraws, d);
+                    sumBatches += b;
+                    samples++;
+                }
+
+                if (samples == 0) Debug.Log("[Perf] batches: render stats unavailable in this run (no graphics device?)");
+                else Debug.Log($"[Perf] batches: avg {sumBatches / (float)samples:0.0}, max {maxBatches}; draw calls max {maxDraws} over {samples} frames");
+            }
+        }
     }
 }

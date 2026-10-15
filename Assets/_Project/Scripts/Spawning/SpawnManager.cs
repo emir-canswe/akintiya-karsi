@@ -71,6 +71,21 @@ namespace Upstream.Spawning
             difficultyScaler = difficulty;
             coinPool = coins;
             wavePool = waves;
+            PrewarmWaves();
+        }
+
+        // Every pooled wave gets its big-wave parts now, so the first big set (2000 m) doesn't build them mid-run.
+        private void PrewarmWaves()
+        {
+            if (wavePool == null) return;
+            int n = wavePool.AvailableCount;
+            var held = new List<WaveObstacle>(n);
+            for (int i = 0; i < n; i++) held.Add(wavePool.Get());
+            foreach (var wave in held)
+            {
+                wave.PrewarmBigParts();
+                wavePool.Return(wave);
+            }
         }
 
         private void OnEnable()

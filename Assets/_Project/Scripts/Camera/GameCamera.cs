@@ -18,6 +18,8 @@ namespace Upstream.Camera
         private UnityEngine.Camera cam;
         private float baseOrthoSize;
         private float currentShakeAmount;
+        private bool shakeApplied;
+        private float lastImpactTime = -10f;
         private Vector3 originalPos;
 
         private float fitHalfWidth = -1f;
@@ -85,10 +87,13 @@ namespace Upstream.Camera
                 randomOffset.z = 0;
                 transform.localPosition = originalPos + randomOffset;
                 currentShakeAmount = Mathf.MoveTowards(currentShakeAmount, 0f, Time.unscaledDeltaTime * 5f);
+                shakeApplied = true;
             }
-            else
+            else if (shakeApplied)
             {
+                // Back to rest once; moving the camera transform every frame would dirty its matrices for nothing.
                 transform.localPosition = originalPos;
+                shakeApplied = false;
             }
         }
 
@@ -109,7 +114,21 @@ namespace Upstream.Camera
             zoomCoroutine = StartCoroutine(ZoomRoutine(baseOrthoSize * (1f + amount), duration));
         }
 
-        private IEnumerator ZoomRoutine(float targetSize, float duration)
+        /// <summary>
+        /// A short, heavy hit: a shake, a tiny freeze and a quick zoom punch. Skipped when a longer effect
+        /// (like devouring a shark) is already playing, and rate-limited so a chain of hits stays readable.
+        /// </summary>
+        public void Impact(float shake)
+        {
+            Shake(shake);
+            if (zoomCoroutine != null || bulletTimeCoroutine != null) return;
+            if (Time.unscaledTime - lastImpactTime < 0.18f) return;
+            lastImpactTime = Time.unscaledTime;
+            zoomCoroutine = StartCoroutine(ZoomRoutine(baseOrthoSize * 0.94f, 0.06f, 0.04f));
+            bulletTimeCoroutine = StartCoroutine(BulletTimeRoutine(0.15f, 0.05f));
+        }
+
+        private IEnumerator ZoomRoutine(float targetSize, float duration, float hold = 0.5f)
         {
             float startSize = cam.orthographicSize;
             float elapsed = 0f;
@@ -124,7 +143,7 @@ namespace Upstream.Camera
             cam.orthographicSize = targetSize;
 
             // Wait briefly before resetting
-            yield return new WaitForSecondsRealtime(0.5f);
+            yield return new WaitForSecondsRealtime(hold);
 
             elapsed = 0f;
             startSize = cam.orthographicSize;

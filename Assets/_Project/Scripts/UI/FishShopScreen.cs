@@ -102,8 +102,23 @@ namespace Upstream.UI
             UIBackStack.Remove(Close);
         }
 
+        private int paintedCards;
+
+        /// <summary>
+        /// Paints the next grid card's fish (its body, tail and fin textures). Returns false once every card
+        /// has its fish. Cards are painted over several frames after start-up rather than all at once.
+        /// </summary>
+        public bool PaintNextCard()
+        {
+            if (cards == null || paintedCards >= cards.Length) return false;
+            var card = cards[paintedCards++];
+            card.preview.SetFish(card.fish);
+            return paintedCards < cards.Length;
+        }
+
         public void Open()
         {
+            while (PaintNextCard()) { } // the shop was opened before the gradual painting finished
             gameObject.SetActive(true);
             UIBackStack.Push(Close);
             selectedId = SaveSystem.Load().equippedFish;
@@ -166,17 +181,19 @@ namespace Upstream.UI
             bool owned = FishShop.Owns(save, fish.id);
             bool equipped = save.equippedFish == fish.id;
 
-            if (balanceText != null) balanceText.text = save.coins.ToString();
-            if (collectionText != null) collectionText.text = $"{FishShop.OwnedCount(save)}/{FishCatalog.Count}";
+            // Texts, colors and rects are only written when they differ: every write dirties the shop's canvas,
+            // and picking a fish used to rewrite all 30 cards although only two of them change.
+            if (balanceText != null) SetLabel(balanceText, save.coins.ToString());
+            if (collectionText != null) SetLabel(collectionText, $"{FishShop.OwnedCount(save)}/{FishCatalog.Count}");
 
             // Detail panel
             bigPreview.SetFish(fish);
-            nameText.text = fish.Name;
+            SetLabel(nameText, fish.Name);
             Color rarityColor = FishCatalog.RarityColor(fish.rarity);
-            rarityText.text = LocalizationManager.Get($"rarity_{(int)fish.rarity}");
+            SetLabel(rarityText, LocalizationManager.Get($"rarity_{(int)fish.rarity}"));
             if (rarityPill != null) rarityPill.color = rarityColor;
             if (previewGlow != null) previewGlow.color = new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.55f);
-            perkText.text = PerkText(fish);
+            SetLabel(perkText, PerkText(fish));
 
             if (equipped)
             {
@@ -204,35 +221,42 @@ namespace Upstream.UI
 
                 card.frame.color = selected ? Color.white : FishCatalog.RarityColor(card.fish.rarity);
 
-                card.nameText.text = card.fish.Name;
-                card.coinIcon.SetActive(!cardOwned);
+                SetLabel(card.nameText, card.fish.Name);
+                if (card.coinIcon.activeSelf == cardOwned) card.coinIcon.SetActive(!cardOwned);
                 // Price tag, or a status chip once owned
                 RectTransform priceRt = card.priceText.rectTransform;
-                priceRt.offsetMin = new Vector2(cardOwned ? 0f : 16f, 0f);
+                Vector2 priceOffset = new Vector2(cardOwned ? 0f : 16f, 0f);
+                if (priceRt.offsetMin != priceOffset) priceRt.offsetMin = priceOffset;
                 if (cardEquipped)
                 {
-                    card.priceText.text = LocalizationManager.Get("equipped_short");
+                    SetLabel(card.priceText, LocalizationManager.Get("equipped_short"));
                     card.priceText.color = Color.white;
                     card.chip.color = BuyColor;
                 }
                 else if (cardOwned)
                 {
-                    card.priceText.text = LocalizationManager.Get("owned");
+                    SetLabel(card.priceText, LocalizationManager.Get("owned"));
                     card.priceText.color = Color.white;
                     card.chip.color = OwnedChip;
                 }
                 else
                 {
-                    card.priceText.text = card.fish.price.ToString();
+                    SetLabel(card.priceText, card.fish.price.ToString());
                     card.priceText.color = save.coins >= card.fish.price ? new Color(1f, 0.86f, 0.3f, 1f) : new Color(1f, 1f, 1f, 0.6f);
                     card.chip.color = PriceChip;
                 }
             }
         }
 
+        /// <summary>Sets a label's text only if it changed (TMP rebuilds the text mesh on every assignment).</summary>
+        private static void SetLabel(TMP_Text label, string text)
+        {
+            if (label.text != text) label.text = text;
+        }
+
         private void SetAction(string label, Color bg, Color text, bool interactable)
         {
-            actionLabel.text = label;
+            SetLabel(actionLabel, label);
             actionLabel.color = text;
             actionBg.color = bg;
             actionButton.interactable = interactable;

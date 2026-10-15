@@ -54,9 +54,27 @@ namespace Upstream.Spawning
             growthConfig = grConfig;
         }
 
+        /// <summary>Screen shake when a turbo-speed fish plows through a rock, log, hook or predator.</summary>
+        private const float TurboSmashShake = 7f;
+
+        /// <summary>Turbo burst-through: camera hit (shake, tiny freeze, zoom punch) plus the fish bulging.</summary>
+        private void TurboImpact(float shake)
+        {
+            gameCamera?.Impact(shake);
+            GameEvents.OnTurboSmash?.Invoke();
+        }
+
+        /// <summary>True when the two points are closer than <paramref name="radius"/> (squared compare: no square root).</summary>
+        private static bool Within(Vector2 a, Vector2 b, float radius)
+        {
+            if (radius <= 0f) return false;
+            return (a - b).sqrMagnitude < radius * radius;
+        }
+
         private void Update()
         {
-            if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameState.Playing) return;
+            var gm = GameManager.Instance;
+            if (gm != null && gm.CurrentState != GameState.Playing) return;
             if (playerTransform == null || spawnManager == null) return;
 
             Vector2 playerPos = playerTransform.position;
@@ -66,40 +84,44 @@ namespace Upstream.Spawning
             float pRadius = baseRadius * hitboxMult * fish.HitboxMultiplier;
             float magnet = fish.MagnetRadius;
             bool isTurbo = turboSystem != null && turboSystem.IsTurboActive;
+            float dt = Time.deltaTime;
 
             var entities = spawnManager.ActiveEntities;
             for (int i = 0; i < entities.Count; i++)
             {
                 // The fish may have died on an earlier entity this frame: nothing more to collect or hit.
-                if (GameManager.Instance != null && GameManager.Instance.CurrentState != GameState.Playing) break;
+                if (gm != null && gm.CurrentState != GameState.Playing) break;
 
                 var entity = entities[i];
-                if (entity == null || !entity.isActive || entity.isFlying) continue;
+                if (!entity.isActive || entity.isFlying) continue;
+
+                // yPosition mirrors the transform's y for every swimming entity, so most of the river
+                // (everything far from the fish) is skipped without asking the engine for a transform.
+                if (Mathf.Abs(entity.yPosition - playerPos.y) > 140f) continue;
 
                 Vector2 ePos = entity.transform.position;
-                if (Mathf.Abs(ePos.y - playerPos.y) > 140f) continue;
 
                 switch (entity.Type)
                 {
                     case EntityType.Food:
-                        if (magnet > 0f && Vector2.Distance(playerPos, ePos) < pRadius + magnet) entity.Attract(playerPos, Time.deltaTime);
-                        if (Vector2.Distance(playerPos, ePos) < (pRadius + 14f))
+                        if (magnet > 0f && Within(playerPos, ePos, pRadius + magnet)) entity.Attract(playerPos, dt);
+                        if (Within(playerPos, ePos, pRadius + 14f))
                         {
                             ((FoodPickup)entity).Collect();
                         }
                         break;
 
                     case EntityType.Coin:
-                        if (magnet > 0f && Vector2.Distance(playerPos, ePos) < pRadius + magnet) entity.Attract(playerPos, Time.deltaTime);
-                        if (Vector2.Distance(playerPos, ePos) < (pRadius + 13f))
+                        if (magnet > 0f && Within(playerPos, ePos, pRadius + magnet)) entity.Attract(playerPos, dt);
+                        if (Within(playerPos, ePos, pRadius + 13f))
                         {
                             ((CoinPickup)entity).Collect();
                         }
                         break;
 
                     case EntityType.GoldFood:
-                        if (magnet > 0f && Vector2.Distance(playerPos, ePos) < pRadius + magnet) entity.Attract(playerPos, Time.deltaTime);
-                        if (Vector2.Distance(playerPos, ePos) < (pRadius + 16f))
+                        if (magnet > 0f && Within(playerPos, ePos, pRadius + magnet)) entity.Attract(playerPos, dt);
+                        if (Within(playerPos, ePos, pRadius + 16f))
                         {
                             ((GoldFoodPickup)entity).Collect();
                         }
@@ -107,12 +129,13 @@ namespace Upstream.Spawning
 
                     case EntityType.Rock:
                         var rock = (RockObstacle)entity;
-                        if (Vector2.Distance(playerPos, ePos) < (pRadius + rock.radius - 4f))
+                        if (Within(playerPos, ePos, pRadius + rock.radius - 4f))
                         {
                             if (isTurbo || fish.Has(FishAbility.RockBreaker))
                             {
                                 rock.Smash(playerPos.x);
-                                if (!isTurbo) gameCamera?.Shake(3f);
+                                if (isTurbo) TurboImpact(TurboSmashShake);
+                                else gameCamera?.Shake(3f);
                             }
                             else if (rock.isSmall && growthSystem != null &&
                                      growthSystem.CurrentStageData != null &&
@@ -139,11 +162,12 @@ namespace Upstream.Spawning
                         float[] parts = sh.HitOffsets;
                         float partRadius = sh.HitRadius * sharkScale;
                         bool sharkHit = false;
+                        Quaternion sharkRot = sh.transform.rotation;
                         for (int k = 0; k < parts.Length; k++)
                         {
                             // Follow the body's heading so a turning predator is hit where it's drawn
-                            Vector2 partPos = ePos + (Vector2)(sh.transform.rotation * new Vector3(0f, parts[k] * sharkScale, 0f));
-                            if (Vector2.Distance(playerPos, partPos) < (pRadius + partRadius))
+                            Vector2 partPos = ePos + (Vector2)(sharkRot * new Vector3(0f, parts[k] * sharkScale, 0f));
+                            if (Within(playerPos, partPos, pRadius + partRadius))
                             {
                                 sharkHit = true;
                                 break;
@@ -178,7 +202,7 @@ namespace Upstream.Spawning
                             else if (isTurbo)
                             {
                                 sh.Smash(playerPos.x);
-                                gameCamera?.Shake(6f);
+                                TurboImpact(TurboSmashShake + 2f);
                             }
                             else
                             {
@@ -201,11 +225,12 @@ namespace Upstream.Spawning
                         float closestX = Mathf.Clamp(playerPos.x, minX, maxX);
                         float closestY = Mathf.Clamp(playerPos.y, minY, maxY);
 
-                        if (Vector2.Distance(playerPos, new Vector2(closestX, closestY)) < (pRadius - 2f))
+                        if (Within(playerPos, new Vector2(closestX, closestY), pRadius - 2f))
                         {
                             if (isTurbo)
                             {
                                 log.Smash(playerPos.x);
+                                TurboImpact(TurboSmashShake);
                             }
                             else
                             {
@@ -225,7 +250,7 @@ namespace Upstream.Spawning
                         float halfW = wave.width * 0.5f;
                         float wx = Mathf.Clamp(playerPos.x, ePos.x - halfW, ePos.x + halfW);
                         float wy = Mathf.Clamp(playerPos.y, wave.HitCenterY - wave.HitHalfHeight, wave.HitCenterY + wave.HitHalfHeight);
-                        if (Vector2.Distance(playerPos, new Vector2(wx, wy)) < pRadius)
+                        if (Within(playerPos, new Vector2(wx, wy), pRadius))
                         {
                             if (wave.isBig)
                             {
@@ -254,11 +279,12 @@ namespace Upstream.Spawning
                     case EntityType.Hook:
                         var hook = (HookTrap)entity;
                         Vector2 hookPos = new Vector2(hook.CurrentX, ePos.y);
-                        if (Vector2.Distance(playerPos, hookPos) < (pRadius + 9f))
+                        if (Within(playerPos, hookPos, pRadius + 9f))
                         {
                             if (isTurbo || fish.Has(FishAbility.HookProof))
                             {
                                 hook.Smash(playerPos.x);
+                                if (isTurbo) TurboImpact(TurboSmashShake);
                             }
                             else
                             {

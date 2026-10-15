@@ -36,6 +36,8 @@ namespace Upstream.Core
         public static Action<int> OnGrowthStageChanged;
         public static Action<bool> OnFoodEaten;
         public static Action OnSharkEaten;
+        /// <summary>A turbo-speed fish plowed through a rock, log, hook or predator.</summary>
+        public static Action OnTurboSmash;
         public static Action OnContinueUsed;
         /// <summary>A coin pickup was collected (arg: coins).</summary>
         public static Action<int> OnCoinCollected;

@@ -27,7 +27,15 @@ namespace Upstream.Entities
             base.OnSpawn(position);
             phase = Random.Range(0f, Mathf.PI * 2f);
             startX = position.x;
-            UpdateLine();
+            lineShown = false;
+            if (fishingLine == null) fishingLine = GetComponent<LineRenderer>();
+            if (fishingLine != null)
+            {
+                // The line is hung from a fixed point at the top of the screen: set once per spawn, not per frame.
+                fishingLine.positionCount = 2;
+                fishingLine.SetPosition(0, new Vector3(startX, GameCamera.ViewHalfHeight + 40f, 0.1f));
+            }
+            UpdateLine(cachedTransform.position);
         }
 
         public override void Tick(float dt, float flowSpeed)
@@ -35,29 +43,29 @@ namespace Upstream.Entities
             if (!isActive) return;
             base.Tick(dt, flowSpeed);
 
+            Vector3 pos = cachedTransform.position;
             if (!isFlying)
             {
                 phase += dt * 1.8f;
-                Vector3 pos = cachedTransform.position;
                 pos.x = CurrentX;
                 cachedTransform.position = pos;
             }
-            UpdateLine();
+            UpdateLine(pos);
         }
 
-        private void UpdateLine()
+        private bool lineShown;
+
+        private void UpdateLine(Vector3 hookPos)
         {
-            if (fishingLine == null) fishingLine = GetComponent<LineRenderer>();
-            if (fishingLine != null)
+            if (fishingLine == null) return;
+
+            bool show = !isFlying;
+            if (show != lineShown)
             {
-                fishingLine.enabled = !isFlying;
-                if (!isFlying)
-                {
-                    fishingLine.positionCount = 2;
-                    fishingLine.SetPosition(0, new Vector3(startX, GameCamera.ViewHalfHeight + 40f, 0.1f));
-                    fishingLine.SetPosition(1, new Vector3(cachedTransform.position.x, cachedTransform.position.y + 12f, 0.1f));
-                }
+                lineShown = show;
+                fishingLine.enabled = show;
             }
+            if (show) fishingLine.SetPosition(1, new Vector3(hookPos.x, hookPos.y + 12f, 0.1f));
         }
     }
 }

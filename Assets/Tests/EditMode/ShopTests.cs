@@ -19,6 +19,16 @@ namespace Upstream.Tests
         }
 
         [Test]
+        public void EveryFish_HasALightMagnet_AndMagnetFishPullFromFarther()
+        {
+            foreach (var fish in FishCatalog.All)
+            {
+                if (fish.Has(FishAbility.Magnet)) Assert.Greater(fish.MagnetRadius, FishDef.BaseMagnetRadius, fish.nameEn);
+                else Assert.AreEqual(FishDef.BaseMagnetRadius, fish.MagnetRadius, fish.nameEn);
+            }
+        }
+
+        [Test]
         public void EveryFishButTheStarter_HasAnAbility_WithADescription()
         {
             foreach (var fish in FishCatalog.All)

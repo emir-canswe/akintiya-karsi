@@ -59,8 +59,10 @@ namespace Upstream.Data
         private int Tier => (int)rarity; // 0 common .. 4 legendary
 
         public bool Has(FishAbility a) => ability == a;
-        /// <summary>Magnet pull radius (world units).</summary>
-        public float MagnetRadius => Has(FishAbility.Magnet) ? 45f + 20f * Tier : 0f;
+        /// <summary>Light pull every fish has, so coins and food right next to it drift in.</summary>
+        public const float BaseMagnetRadius = 28f;
+        /// <summary>Magnet pull radius (world units): the light base pull, much wider for magnet fish.</summary>
+        public float MagnetRadius => Has(FishAbility.Magnet) ? 45f + 20f * Tier : BaseMagnetRadius;
         /// <summary>Steering speed multiplier.</summary>
         public float SteeringMultiplier => Has(FishAbility.Agile) ? 1.15f + 0.1f * Tier : 1f;
         /// <summary>Turbo duration multiplier.</summary>

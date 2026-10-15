@@ -19,12 +19,21 @@ namespace Upstream.UI
             Apply();
         }
 
+        // The safe area only changes with rotation, split screen or a cutout setting, so asking the system for it
+        // twice a second is plenty; the size check is cheap and still reacts at once.
+        private const float SafeAreaPollSeconds = 0.5f;
+        private float nextSafeAreaPoll;
+
         private void Update()
         {
-            if (Screen.safeArea != lastSafeArea || Screen.width != lastScreenSize.x || Screen.height != lastScreenSize.y)
+            bool sizeChanged = Screen.width != lastScreenSize.x || Screen.height != lastScreenSize.y;
+            if (!sizeChanged)
             {
-                Apply();
+                if (Time.unscaledTime < nextSafeAreaPoll) return;
+                nextSafeAreaPoll = Time.unscaledTime + SafeAreaPollSeconds;
+                if (Screen.safeArea == lastSafeArea) return;
             }
+            Apply();
         }
 
         private void Apply()

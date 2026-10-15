@@ -83,6 +83,22 @@ namespace Upstream.Entities
             ApplyAlpha(1f);
         }
 
+        /// <summary>
+        /// Builds the parts of a big wave (foam layers, 22 spray drops) ahead of time and leaves them hidden:
+        /// creating that many objects when the first set rolls in would hitch the run.
+        /// </summary>
+        public void PrewarmBigParts()
+        {
+            if (body == null)
+            {
+                body = GetComponent<SpriteRenderer>();
+                if (body == null) return;
+                smallSprite = body.sprite;
+            }
+            EnsureBigParts();
+            bigParts.SetActive(false);
+        }
+
         /// <summary>Marks the wave as used up; it fades away over the next moment.</summary>
         public void Spend() => spent = true;
 

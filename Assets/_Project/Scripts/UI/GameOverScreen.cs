@@ -31,6 +31,7 @@ namespace Upstream.UI
         private float cardHeightWithContinue;
         private float cardHeightWithoutContinue;
         private float animTime = 1f;
+        private int shownScore = -1; // count-up: last number put on screen
         private Button menuButton;
         private IAdsService adsService;
         private bool hasContinued;
@@ -144,6 +145,7 @@ namespace Upstream.UI
                 card.sizeDelta = new Vector2(card.sizeDelta.x, canContinue ? cardHeightWithContinue : cardHeightWithoutContinue);
             }
             animTime = 0f; // card pop + score count-up
+            shownScore = -1;
         }
 
         private int CurrentScore()
@@ -209,7 +211,12 @@ namespace Upstream.UI
             {
                 float t = Mathf.Clamp01((animTime - 0.15f) / 0.7f);
                 int shown = Mathf.RoundToInt(CurrentScore() * (1f - Mathf.Pow(1f - t, 3f)));
-                scoreText.text = $"{shown}<size=45%>m</size>";
+                if (shown != shownScore)
+                {
+                    // Only when the number changes, and formatted without building a new string each time.
+                    shownScore = shown;
+                    scoreText.SetText("{0:0}<size=45%>m</size>", shown);
+                }
             }
 
             // NEW BEST sticker throbs

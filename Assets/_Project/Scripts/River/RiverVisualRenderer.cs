@@ -24,6 +24,8 @@ namespace Upstream.River
         private SpriteRenderer causticsFar;
         private Transform leftGrass, rightGrass, leftShore, rightShore;
 
+        private SpriteRenderer flowStreaks;
+        private Transform[] rays;
         private Transform[] glints;
         private Transform[] bubbles;
         private Transform[] bankDecos;
@@ -45,6 +47,7 @@ namespace Upstream.River
         private BurstParticle[] particles;
         private Player.PlayerController player;
         private float bubbleTimer;
+        private Color glowColor, deepColor;
 
         public void Configure(RiverController controller, GameConfig config)
         {
@@ -95,11 +98,13 @@ namespace Upstream.River
             // Water: deep color everywhere, lighter band down the middle, two layers of sunlight.
             waterDeep = CreateRenderer("WaterDeep", new Vector3(0f, 0f, 5f), WatercolorSpriteFactory.GetWhiteSprite(), -20);
             waterDeep.transform.localScale = new Vector3(rw * 2f + 20f, quadH, 1f);
-            waterDeep.color = new Color(0.10f, 0.65f, 0.85f);
+            deepColor = new Color(0.10f, 0.65f, 0.85f);
+            waterDeep.color = deepColor;
 
             waterGlow = CreateRenderer("WaterGlow", new Vector3(0f, 0f, 4.9f), CartoonSpriteFactory.GetWaterGlow(), -19);
             waterGlow.transform.localScale = new Vector3(rw * 2f / 64f, quadH / 4f, 1f);
-            waterGlow.color = new Color(0.31f, 0.89f, 0.94f);
+            glowColor = new Color(0.31f, 0.89f, 0.94f);
+            waterGlow.color = glowColor;
 
             causticsFar = CreateTiled("CausticsFar", CartoonSpriteFactory.GetCaustics(), -18, new Vector2(rw * 2f, tiledH), 0f);
             causticsFar.transform.localScale = new Vector3(1.6f, 1.6f, 1f);
@@ -107,6 +112,34 @@ namespace Upstream.River
             causticsFar.color = new Color(1f, 1f, 1f, 0.10f);
             causticsNear = CreateTiled("CausticsNear", CartoonSpriteFactory.GetCaustics(), -17, new Vector2(rw * 2f, tiledH), 0f);
             causticsNear.color = new Color(1f, 1f, 1f, 0.17f);
+
+            // Water life: pale shallows and a thin contact shadow along each bank, streaks of faster water,
+            // and a few slow shafts of sunlight.
+            Sprite edge = CartoonSpriteFactory.GetEdgeGradient();
+            const float shallowW = 58f, shadowW = 16f;
+            for (int side = -1; side <= 1; side += 2)
+            {
+                var shallow = CreateRenderer(side < 0 ? "ShallowLeft" : "ShallowRight", new Vector3(side * (rw - shallowW * 0.5f), 0f, 4.8f), edge, -16);
+                shallow.transform.localScale = new Vector3(shallowW / 64f, quadH / 4f, 1f);
+                shallow.color = new Color(0.62f, 1f, 0.86f, 0.55f);
+                shallow.flipX = side > 0;
+                var shadow = CreateRenderer(side < 0 ? "ShadowLeft" : "ShadowRight", new Vector3(side * (rw - shadowW * 0.5f), 0f, 4.7f), edge, -16);
+                shadow.transform.localScale = new Vector3(shadowW / 64f, quadH / 4f, 1f);
+                shadow.color = new Color(0.0f, 0.22f, 0.35f, 0.38f);
+                shadow.flipX = side > 0;
+            }
+            flowStreaks = CreateTiled("FlowStreaks", CartoonSpriteFactory.GetFlowStreaks(), -16, new Vector2(rw * 2f, tiledH), 0f);
+            flowStreaks.color = new Color(1f, 1f, 1f, 0.24f);
+
+            rays = new Transform[3];
+            for (int i = 0; i < rays.Length; i++)
+            {
+                var ray = CreateRenderer($"SunRay_{i}", new Vector3(0f, 0f, 3.5f), CartoonSpriteFactory.GetLightRay(), -13);
+                ray.transform.localScale = new Vector3((70f + i * 34f) / 32f, (quadH + 260f) / 256f, 1f);
+                ray.transform.localRotation = Quaternion.Euler(0f, 0f, 13f + i * 3f);
+                ray.color = new Color(1f, 0.97f, 0.78f, 0.11f - i * 0.02f);
+                rays[i] = ray.transform;
+            }
 
             // Banks: tiled grass, then the sand/foam shore strip whose foam line sits on the water's edge.
             Sprite grass = CartoonSpriteFactory.GetGrassTile();
@@ -121,7 +154,7 @@ namespace Upstream.River
             rightShore = rs.transform;
 
             // Surface glints and drifting bubbles
-            glints = new Transform[14];
+            glints = new Transform[22];
             for (int i = 0; i < glints.Length; i++)
             {
                 var sr = CreateRenderer($"Glint_{i}", Vector3.zero, CartoonSpriteFactory.GetGlint(), -15);
@@ -161,23 +194,28 @@ namespace Upstream.River
                     float jitter = Hash01(i, side, 2);
                     float x;
 
+                    // Every kind has its own sorting order (bigger things in front). Sprites are drawn in sorting
+                    // order, and each kind is its own texture: with kinds mixed on one order the GPU batches break
+                    // at every change of texture; sorted by kind it is one batch per kind.
                     if (r < 0.22f)
                     {
                         // Tree canopy peeking in from the edge of the screen
                         sr.sprite = CartoonSpriteFactory.GetTree();
-                        sr.sortingOrder = -2;
+                        sr.sortingOrder = -1;
                         t.localScale = Vector3.one * (0.75f + jitter * 0.3f);
                         x = rw + 34f + jitter * 10f;
                     }
                     else if (r < 0.45f)
                     {
                         sr.sprite = CartoonSpriteFactory.GetFlowerBush();
+                        sr.sortingOrder = -2;
                         t.localScale = Vector3.one * (0.6f + jitter * 0.25f);
                         x = rw + 22f + jitter * 8f;
                     }
                     else if (r < 0.58f)
                     {
                         sr.sprite = CartoonSpriteFactory.GetMushroom();
+                        sr.sortingOrder = -3;
                         t.localScale = Vector3.one * (0.42f + jitter * 0.15f);
                         x = rw + 16f + jitter * 6f;
                     }
@@ -185,6 +223,7 @@ namespace Upstream.River
                     {
                         // Pebbles on the sand
                         sr.sprite = CartoonSpriteFactory.GetStone();
+                        sr.sortingOrder = -4;
                         sr.color = stoneTints[i % stoneTints.Length];
                         t.localScale = Vector3.one * (0.4f + jitter * 0.25f);
                         x = rw + 7f + jitter * 7f;
@@ -329,12 +368,16 @@ namespace Upstream.River
             float rw = RiverHalfWidth;
             float viewH = GameCamera.ViewHalfHeight;
 
-            // Region color blend
-            if (riverController != null && riverController.ActiveRegion != null)
+            // Region color blend. Colors are tracked here and only written to the renderers while they still
+            // move (a region lookup is a loop, and a sprite color write dirties the sprite every frame).
+            RegionData reg = riverController != null ? riverController.ActiveRegion : null;
+            if (reg != null)
             {
-                RegionData reg = riverController.ActiveRegion;
-                waterGlow.color = Color.Lerp(waterGlow.color, reg.waterColor1, Time.deltaTime * 2f);
-                waterDeep.color = Color.Lerp(waterDeep.color, reg.waterColor2, Time.deltaTime * 2f);
+                float k = Time.deltaTime * 2f;
+                Color glow = Color.Lerp(glowColor, reg.waterColor1, k);
+                if (glow != glowColor) { glowColor = glow; waterGlow.color = glow; }
+                Color deep = Color.Lerp(deepColor, reg.waterColor2, k);
+                if (deep != deepColor) { deepColor = deep; waterDeep.color = deep; }
             }
 
             // Tiled layers scroll with the river (pattern repeats every tile, so wrap the offset).
@@ -344,6 +387,13 @@ namespace Upstream.River
             SetY(leftShore, bankY);
             SetY(rightShore, bankY);
             SetY(causticsNear.transform, -Mathf.Repeat(scroll * 1.05f, TileH));
+            SetY(flowStreaks.transform, -Mathf.Repeat(scroll * 1.6f, TileH));
+            for (int i = 0; i < rays.Length; i++)
+            {
+                Vector3 rp = rays[i].localPosition;
+                rp.x = Mathf.Sin(Time.time * (0.11f + i * 0.04f) + i * 2.3f) * rw * 0.85f;
+                rays[i].localPosition = rp;
+            }
             SetY(causticsFar.transform, -Mathf.Repeat(scroll * 0.8f + Time.time * 6f, TileH * 1.6f));
             Vector3 farPos = causticsFar.transform.localPosition;
             farPos.x = Mathf.Sin(Time.time * 0.3f) * 10f; // slow sideways shimmer
@@ -356,6 +406,9 @@ namespace Upstream.River
                 float x = -rw + 18f + ((i * 53f) % ((rw - 18f) * 2f));
                 float y = Mathf.Repeat(i * 97f - scroll * 1.1f, spanY) - (viewH + 40f);
                 glints[i].localPosition = new Vector3(x + Mathf.Sin(i + Time.time * 2f) * 3f, y, 0f);
+                // twinkle: the glint swells and shrinks out of step with its neighbours
+                float tw = 0.35f + 0.65f * Mathf.Abs(Mathf.Sin(Time.time * (1.4f + (i % 4) * 0.5f) + i * 1.7f));
+                glints[i].localScale = new Vector3(0.7f * tw, (0.6f + (i % 3) * 0.25f) * tw, 1f);
             }
 
             // Bubbles: rise slowly against the current with a wobble
@@ -393,10 +446,16 @@ namespace Upstream.River
 
         private void UpdateParticles(float dt)
         {
-            float flow = riverController != null ? riverController.FlowSpeed : 150f;
+            float flow = 0f;
+            bool flowKnown = false; // the flow speed is only needed while a particle is alive
             for (int i = 0; i < particles.Length; i++)
             {
                 if (!particles[i].active) continue;
+                if (!flowKnown)
+                {
+                    flow = riverController != null ? riverController.FlowSpeed : 150f;
+                    flowKnown = true;
+                }
                 ref BurstParticle p = ref particles[i];
                 p.life -= dt;
                 if (p.life <= 0f)

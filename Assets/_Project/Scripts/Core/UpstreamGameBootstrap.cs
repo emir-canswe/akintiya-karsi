@@ -82,6 +82,17 @@ namespace Upstream.Core
             LocalizationManager.OnLanguageChanged -= HandleLanguageChanged;
         }
 
+        /// <summary>
+        /// Paints the shop's fish one per frame once the menu is up, so the start of the game isn't held back by
+        /// 30 fish worth of textures. Opening the shop early finishes the rest on the spot.
+        /// </summary>
+        private System.Collections.IEnumerator PaintShopCardsGradually(FishShopScreen shop)
+        {
+            yield return null; // let the first frames (menu, river) render first
+            yield return null;
+            while (shop != null && shop.PaintNextCard()) yield return null;
+        }
+
         private void HandleLanguageChanged()
         {
             shownStage = -1; // force the stage badge to re-render in the new language
@@ -191,6 +202,7 @@ namespace Upstream.Core
             playerObj.AddComponent<PlayerFishRenderer>();
 
             // 7. Entity Prefab Templates & Object Pools
+            CartoonSpriteFactory.PrewarmGameplayArt(); // painted now, not when the first piranha / big wave shows up
             Transform templatesRoot = new GameObject("EntityTemplates").transform;
             templatesRoot.SetParent(transform, false);
             templatesRoot.gameObject.SetActive(false);
@@ -611,6 +623,7 @@ namespace Upstream.Core
 
             // --- FISH SHOP (full screen, opened from the menu) ---
             FishShopScreen shop = BuildShopPanel(canvasObj.transform, whiteSpr);
+            StartCoroutine(PaintShopCardsGradually(shop));
 
             // --- SETTINGS PANEL (on top of everything; opened from menu and pause) ---
             SettingsScreen settings = BuildSettingsPanel(canvasObj.transform, whiteSpr);
@@ -1042,8 +1055,9 @@ namespace Upstream.Core
                 cardName.fontSizeMin = 7f;
                 cardName.fontSizeMax = 10f;
                 SetOutline(cardName, 0.25f);
+                // The fish itself is painted later (FishShopScreen.PaintNextCard): 30 fish = 90 textures, which
+                // would otherwise all be painted before the menu appears.
                 FishPreview preview = FishPreview.Create(inner.transform, new Vector2(0f, 2f), 70f, false);
-                preview.SetFish(fish);
 
                 // Price tag / status chip at the bottom
                 GameObject chipObj = CreateUIRect("Chip", inner.transform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 15f), new Vector2(78f, 22f));

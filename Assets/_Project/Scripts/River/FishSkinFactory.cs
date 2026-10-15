@@ -11,7 +11,9 @@ namespace Upstream.River
     /// </summary>
     public static class FishSkinFactory
     {
-        private const float PixelsPerUnit = 1.8f; // matches WatercolorSpriteFactory's fish sprites
+        // Painted at 2x the old 64x96 so the fish stay crisp on a phone; world size is unchanged (PPU scales with it).
+        private const int Scale = 2;
+        private const float PixelsPerUnit = 1.8f * Scale;
 
         private static readonly Dictionary<int, Sprite> Bodies = new Dictionary<int, Sprite>();
         private static readonly Dictionary<int, Sprite> Tails = new Dictionary<int, Sprite>();
@@ -59,6 +61,21 @@ namespace Upstream.River
         // Cheap deterministic hash in [0,1) for star fields.
         private static float Hash(int x, int y) => Frac(Mathf.Sin(x * 127.1f + y * 311.7f) * 43758.547f);
 
+        private static float Smooth(float a, float b, float x)
+        {
+            float t = Mathf.Clamp01((x - a) / (b - a));
+            return t * t * (3f - 2f * t);
+        }
+
+        /// <summary>k above 1 pushes a color away from gray (livelier), below 1 pulls it toward gray.</summary>
+        private static Color Saturate(Color c, float k)
+        {
+            float l = c.r * 0.299f + c.g * 0.587f + c.b * 0.114f;
+            return new Color(Mathf.Clamp01(l + (c.r - l) * k), Mathf.Clamp01(l + (c.g - l) * k), Mathf.Clamp01(l + (c.b - l) * k), c.a);
+        }
+
+        private static Color Tint(Color c, Color toward, float t) => Color.Lerp(c, toward, Mathf.Clamp01(t));
+
         /// <summary>Cartoon outline: a deep, slightly navy shade of the fish's own color.</summary>
         private static Color OutlineFor(FishDef f)
         {
@@ -68,61 +85,118 @@ namespace Upstream.River
             return c;
         }
 
+        private static readonly Vector3 LightDir = new Vector3(-0.5f, 0.6f, 0.62f).normalized;
+
         private static Sprite PaintBody(FishDef f)
         {
-            const int w = 64, h = 96;
+            const int w = 64 * Scale, h = 96 * Scale;
             Texture2D tex = NewTexture(w, h);
-            Color eyeBlack = new Color(0.06f, 0.13f, 0.17f, 1f);
             Color outlineCol = OutlineFor(f);
+            bool rainbow = f.pattern == FishPattern.Rainbow;
             Color[] pixels = new Color[w * h];
+            float outlineW = 2.1f * Scale;
+            float radiusPx = w * 0.34f;
 
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
                 {
-                    float nx = (x - w * 0.5f) / (w * 0.34f);
                     float ny = (y - h * 0.5f) / (h * 0.44f);
+                    // Fish shape: full width at the head, tapering toward the tail
+                    float taper = Mathf.Lerp(1f, 0.62f, Smooth(0.25f, -1f, ny));
+                    float nx = (x - w * 0.5f) / (w * 0.34f * taper);
                     float d = nx * nx + ny * ny;
-                    if (d > 1f) { pixels[y * w + x] = Color.clear; continue; }
+                    float r = Mathf.Sqrt(d);
+                    float edgePx = (1f - r) * radiusPx * taper; // distance to the silhouette, in pixels
+                    if (edgePx < -0.5f) { pixels[y * w + x] = Color.clear; continue; }
 
-                    float grain = 0.95f + 0.05f * Mathf.PerlinNoise(x * 0.2f + f.id * 3.1f, y * 0.2f);
-                    Color c = f.pattern == FishPattern.Rainbow
-                        ? Color.HSVToRGB(Frac(0.62f - ny * 0.42f), 0.62f, 1f)
-                        : f.body;
-                    c *= grain;
+                    Color c = rainbow ? Color.HSVToRGB(Frac(0.62f - ny * 0.42f), 0.62f, 1f) : Saturate(f.body, 1.3f);
 
-                    // Belly
-                    float bx = nx / 0.52f, by = (ny + 0.08f) / 0.65f;
-                    float bd = bx * bx + by * by;
-                    if (bd < 1f) c = Color.Lerp(c, f.pattern == FishPattern.Rainbow ? Color.white : f.belly, (1f - bd) * 0.85f);
+                    // Belly: lighter underside that fades smoothly into the back
+                    float bx = nx / 0.55f, by = (ny + 0.08f) / 0.68f;
+                    float bd = Mathf.Sqrt(bx * bx + by * by);
+                    Color belly = rainbow ? Color.white : Saturate(f.belly, 1.1f);
+                    c = Color.Lerp(c, belly, Smooth(1f, 0.15f, bd) * 0.9f);
 
                     c = ApplyPattern(f, c, nx, ny, x, y);
 
-                    // Glossy highlight on the upper-left of the back
-                    float shine = Mathf.Clamp01(1f - Vector2.Distance(new Vector2(nx, ny), new Vector2(-0.32f, 0.22f)) / 0.3f);
-                    c = Color.Lerp(c, Color.white, shine * shine * 0.45f);
-
-                    // Big cartoon eyes near the top (+ny) with a white sparkle
-                    for (int side = -1; side <= 1; side += 2)
+                    // Fine scales: faint arcs over the whole body so it reads as a fish, not a blob
+                    if (ny < 0.5f && f.pattern != FishPattern.Scales && f.pattern != FishPattern.Facets)
                     {
-                        Vector2 p = new Vector2(nx, ny);
-                        Vector2 pupil = new Vector2(side * 0.56f, 0.60f);
-                        float eyeWhite = Vector2.Distance(p, new Vector2(side * 0.52f, 0.56f));
-                        if (eyeWhite < 0.25f) c = eyeWhite > 0.21f ? outlineCol : Color.white;
-                        if (Vector2.Distance(p, pupil) < 0.13f) c = eyeBlack;
-                        if (Vector2.Distance(p, pupil + new Vector2(-0.05f, 0.05f)) < 0.05f) c = Color.white;
+                        float sv = ny * 8.5f, su = nx * 5.2f;
+                        float row = Mathf.Floor(sv);
+                        float sx = Frac(su + (Mathf.Abs(row) % 2f) * 0.5f) - 0.5f;
+                        float sy = Frac(sv) - 0.2f;
+                        float arc = 1f - Smooth(0f, 0.09f, Mathf.Abs(Mathf.Sqrt(sx * sx + sy * sy) - 0.5f));
+                        c *= 1f - 0.08f * arc * (1f - 0.4f * r);
                     }
 
-                    // Dark outline band along the edge of the body
-                    if (Mathf.Sqrt(d) > 0.9f) c = outlineCol;
+                    // Volume: a lit dome, bright top-left, shaded bottom-right
+                    float z = Mathf.Sqrt(Mathf.Max(0f, 1f - d));
+                    float lambert = Mathf.Max(0f, Vector3.Dot(new Vector3(nx, ny, z).normalized, LightDir));
+                    c = new Color(c.r * (0.66f + 0.52f * lambert), c.g * (0.66f + 0.52f * lambert), c.b * (0.68f + 0.5f * lambert), 1f);
+                    c *= 1f - 0.12f * Smooth(-0.55f, -1f, ny); // tail end sits in shade
 
-                    c.a = Mathf.Clamp01((1f - d) * 8f) * f.alpha;
+                    // Cool rim light on the shaded edge (reflected river light)
+                    float rim = Smooth(0.62f, 0.95f, r) * Smooth(-0.1f, 0.7f, nx * 0.7f - ny * 0.55f);
+                    c = Tint(c, new Color(0.65f, 0.95f, 1f, 1f), rim * 0.5f);
+
+                    // Glossy highlights: a long soft streak and a crisp spot
+                    float hx = (nx + 0.34f) / 0.2f, hy = (ny - 0.18f) / 0.42f;
+                    float streak = Mathf.Exp(-(hx * hx + hy * hy));
+                    c = Tint(c, Color.white, streak * 0.7f);
+                    float sx2 = (nx + 0.40f) / 0.07f, sy2 = (ny - 0.45f) / 0.1f;
+                    c = Tint(c, Color.white, Mathf.Exp(-(sx2 * sx2 + sy2 * sy2)) * 0.95f);
+                    float gx = (nx - 0.36f) / 0.06f, gy = (ny + 0.38f) / 0.08f;
+                    c = Tint(c, Color.white, Mathf.Exp(-(gx * gx + gy * gy)) * 0.45f);
+
+                    // Big shiny cartoon eyes near the top (+ny)
+                    for (int side = -1; side <= 1; side += 2)
+                        c = PaintEye(c, nx, ny, side, outlineCol);
+
+                    // Smooth dark outline band along the silhouette
+                    c = Color.Lerp(c, outlineCol, Smooth(outlineW + 1.2f, outlineW - 1.2f, edgePx));
+
+                    c.a = Mathf.Clamp01(edgePx + 0.5f) * f.alpha;
                     pixels[y * w + x] = c;
                 }
             }
             tex.SetPixels(pixels);
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), PixelsPerUnit);
+        }
+
+        /// <summary>One eye: shaded white, colored iris, deep pupil, two sparkles, heavier ring on the lid side.</summary>
+        private static Color PaintEye(Color c, float nx, float ny, int side, Color outlineCol)
+        {
+            const float radius = 0.31f;
+            Vector2 center = new Vector2(side * 0.47f, 0.54f);
+            Vector2 u = (new Vector2(nx, ny) - center) / radius; // eye space: unit circle
+            float e = u.magnitude;
+            if (e > 1.06f) return c;
+
+            // Sclera, slightly shaded under the lid
+            Color eye = Color.Lerp(Color.white, new Color(0.78f, 0.86f, 0.95f, 1f), Smooth(0.1f, 1f, u.y * 0.8f + e * 0.3f));
+
+            Vector2 irisC = new Vector2(side * 0.10f, 0.06f);
+            float ir = (u - irisC).magnitude;
+            if (ir < 0.68f)
+            {
+                float t = ir / 0.68f;
+                Color irisLight = new Color(0.30f, 0.62f, 0.98f, 1f), irisDark = new Color(0.04f, 0.12f, 0.36f, 1f);
+                eye = Color.Lerp(irisLight, irisDark, Smooth(0.15f, 1f, t) * 0.8f + (u.y < irisC.y ? 0.1f : 0f));
+                if (ir < 0.38f) eye = new Color(0.02f, 0.05f, 0.10f, 1f); // pupil
+            }
+            // sparkles
+            float s1 = (u - new Vector2(irisC.x - 0.25f, irisC.y + 0.30f)).magnitude;
+            if (s1 < 0.24f) eye = Color.Lerp(eye, Color.white, Smooth(0.24f, 0.14f, s1));
+            float s2 = (u - new Vector2(irisC.x + 0.26f, irisC.y - 0.28f)).magnitude;
+            if (s2 < 0.11f) eye = Color.Lerp(eye, Color.white, Smooth(0.11f, 0.06f, s2) * 0.9f);
+
+            // rim of the eye: dark ring, heavier on top like a lid
+            float ring = 0.86f - 0.06f * Mathf.Clamp01(u.y);
+            eye = Color.Lerp(eye, outlineCol, Smooth(ring, ring + 0.1f, e));
+            return Color.Lerp(c, eye, 1f - Smooth(0.98f, 1.06f, e));
         }
 
         private static Color ApplyPattern(FishDef f, Color c, float nx, float ny, int x, int y)
@@ -225,35 +299,40 @@ namespace Upstream.River
 
         private static Sprite PaintTail(FishDef f)
         {
-            const int w = 48, h = 40;
+            const int w = 48 * Scale, h = 40 * Scale;
             Texture2D tex = NewTexture(w, h);
             Color[] pixels = new Color[w * h];
+            Color outlineCol = OutlineFor(f);
+            bool rainbow = f.pattern == FishPattern.Rainbow;
+            float outlineW = 1.5f * Scale;
             for (int y = 0; y < h; y++)
             {
                 float t = 1f - (float)y / h; // 0 at the top pivot, 1 at the tip
-                float halfSpan = Mathf.Lerp(2f, w * 0.44f, t);
-                float notch = t > 0.72f ? (t - 0.72f) * 28f : 0f;
-                Color col = f.pattern == FishPattern.Rainbow ? Color.HSVToRGB(Frac(0.15f + t * 0.6f), 0.6f, 1f) : f.tail;
-                Color outlineCol = OutlineFor(f);
+                float halfSpan = Mathf.Lerp(2f * Scale, w * 0.44f, t);
+                float notchHalf = t > 0.72f ? (t - 0.72f) * 14f * Scale : 0f;
+                Color baseCol = rainbow ? Color.HSVToRGB(Frac(0.15f + t * 0.6f), 0.6f, 1f) : Saturate(f.tail, 1.18f);
+                Color tipCol = Tint(Saturate(f.tail, 1.3f), Color.white, 0.28f);
 
                 for (int x = 0; x < w; x++)
                 {
                     float dx = Mathf.Abs(x - w * 0.5f);
-                    if (dx <= halfSpan && dx >= notch * 0.5f)
-                    {
-                        // Fin rays: faint darker lines fanning out.
-                        float ray = Mathf.Abs(Frac(dx / Mathf.Max(halfSpan, 1f) * 3f) - 0.5f) < 0.08f ? 0.88f : 1f;
-                        Color c = col * ray;
-                        float edge = Mathf.Min(halfSpan - dx, y + 0.5f);
-                        if (notch > 0f) edge = Mathf.Min(edge, dx - notch * 0.5f);
-                        if (edge < 1.6f) c = outlineCol;
-                        c.a = Mathf.Clamp01((halfSpan - dx) * 1.5f) * f.alpha;
-                        pixels[y * w + x] = c;
-                    }
-                    else
-                    {
-                        pixels[y * w + x] = Color.clear;
-                    }
+                    if (dx > halfSpan + 0.5f || dx < notchHalf - 0.5f) { pixels[y * w + x] = Color.clear; continue; }
+
+                    float edge = Mathf.Min(halfSpan - dx, y + 0.5f);
+                    if (notchHalf > 0f) edge = Mathf.Min(edge, dx - notchHalf);
+
+                    float span01 = dx / Mathf.Max(halfSpan, 1f);
+                    // Color runs from the body (deep, saturated) out to a sunlit, lighter tip
+                    Color c = Color.Lerp(baseCol * 0.82f, tipCol, Smooth(0.15f, 1f, t));
+                    // Soft fin rays fanning out, bright between them
+                    float ray = Mathf.Abs(Frac(span01 * 3.5f) - 0.5f);
+                    c *= 1f - 0.16f * (1f - Smooth(0f, 0.12f, ray));
+                    // Light sheen down the middle
+                    c = Tint(c, Color.white, 0.22f * (1f - span01) * t);
+
+                    c = Color.Lerp(c, outlineCol, Smooth(outlineW + 1f, outlineW - 1f, edge));
+                    c.a = Mathf.Clamp01(edge + 0.5f) * f.alpha * Mathf.Lerp(1f, 0.88f, t);
+                    pixels[y * w + x] = c;
                 }
             }
             tex.SetPixels(pixels);
@@ -263,9 +342,13 @@ namespace Upstream.River
 
         private static Sprite PaintFin(FishDef f)
         {
-            const int w = 32, h = 20;
+            const int w = 32 * Scale, h = 20 * Scale;
             Texture2D tex = NewTexture(w, h);
             Color[] pixels = new Color[w * h];
+            Color outlineCol = OutlineFor(f);
+            bool rainbow = f.pattern == FishPattern.Rainbow;
+            float radiusPx = Mathf.Min(w * 0.45f, h * 0.42f);
+            float outlineW = 1.4f * Scale;
             for (int y = 0; y < h; y++)
             {
                 for (int x = 0; x < w; x++)
@@ -273,10 +356,19 @@ namespace Upstream.River
                     float nx = (x - w * 0.5f) / (w * 0.45f);
                     float ny = (y - h * 0.5f) / (h * 0.42f);
                     float d = nx * nx + ny * ny;
-                    if (d > 1f) { pixels[y * w + x] = Color.clear; continue; }
-                    Color c = f.pattern == FishPattern.Rainbow ? Color.HSVToRGB(Frac(0.5f + nx * 0.2f), 0.45f, 1f) : f.fin;
-                    if (Mathf.Sqrt(d) > 0.82f) c = OutlineFor(f);
-                    c.a = Mathf.Clamp01((1f - d) * 5f) * f.alpha;
+                    float r = Mathf.Sqrt(d);
+                    float edge = (1f - r) * radiusPx;
+                    if (edge < -0.5f) { pixels[y * w + x] = Color.clear; continue; }
+
+                    Color c = rainbow ? Color.HSVToRGB(Frac(0.5f + nx * 0.2f), 0.45f, 1f) : Saturate(f.fin, 1.2f);
+                    // Lighter toward the outer tip, with a few fine rays and a gloss
+                    c = Tint(c, Color.white, 0.25f * Smooth(0.1f, 1f, Mathf.Abs(nx)));
+                    float ray = Mathf.Abs(Frac((Mathf.Atan2(ny, nx) / Mathf.PI) * 5f) - 0.5f);
+                    c *= 1f - 0.14f * (1f - Smooth(0f, 0.12f, ray));
+                    c = Tint(c, Color.white, 0.4f * Mathf.Exp(-((nx * nx) / 0.5f + ((ny - 0.35f) * (ny - 0.35f)) / 0.08f)));
+
+                    c = Color.Lerp(c, outlineCol, Smooth(outlineW + 1f, outlineW - 1f, edge));
+                    c.a = Mathf.Clamp01(edge + 0.5f) * f.alpha * 0.96f;
                     pixels[y * w + x] = c;
                 }
             }

@@ -131,8 +131,11 @@ namespace Upstream.Entities
             if (isFlying || !isActive) return;
 
             float trackingSpeed = (spawnConfig != null ? spawnConfig.sharkTrackingSpeed : 62f) * (1f + 0.7f * Mathf.Clamp01(difficulty));
-            float playerX = playerTransform != null ? playerTransform.position.x : cachedTransform.position.x;
-            bool above = playerTransform != null && yPosition > playerTransform.position.y + 40f;
+            // Transform reads are engine calls: look at the predator and the fish once per tick.
+            Vector3 myPos = cachedTransform.position;
+            Vector3 playerPos = playerTransform != null ? playerTransform.position : myPos;
+            float playerX = playerPos.x;
+            bool above = playerTransform != null && yPosition > playerPos.y + 40f;
             float targetVx = 0f;
             float beatSpeed = 7f;
             float shiver = 0f;
@@ -143,15 +146,15 @@ namespace Upstream.Entities
                     if (pikeTimer < 0f)
                     {
                         // Cruise slowly, stalking: lines up with the player like a shark does
-                        if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 2f, -trackingSpeed, trackingSpeed);
-                        if (playerTransform != null && yPosition - playerTransform.position.y < PikeTriggerDistance) pikeTimer = 0f;
+                        if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 2f, -trackingSpeed, trackingSpeed);
+                        if (playerTransform != null && yPosition - playerPos.y < PikeTriggerDistance) pikeTimer = 0f;
                     }
                     else if (pikeTimer < PikeWindup)
                     {
                         // Wind-up: nearly stops and shivers (the warning), aiming at the player
                         pikeTimer += dt;
                         downwardVelocity = Mathf.MoveTowards(downwardVelocity, -flowSpeed * 0.6f, 900f * dt);
-                        targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 3f, -trackingSpeed * 1.4f, trackingSpeed * 1.4f);
+                        targetVx = Mathf.Clamp((playerX - myPos.x) * 3f, -trackingSpeed * 1.4f, trackingSpeed * 1.4f);
                         shiver = Mathf.Sin(Time.time * 60f) * 6f;
                         beatSpeed = 24f;
                     }
@@ -160,31 +163,31 @@ namespace Upstream.Entities
                         // Lunge: fast, still bending a little toward the player (a quick sideways dash dodges it)
                         float lunge = Mathf.Lerp(PikeLungeEasy, PikeLungeHard, Mathf.Clamp01(difficulty));
                         downwardVelocity = Mathf.MoveTowards(downwardVelocity, lunge, 1800f * dt);
-                        if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 1.5f, -trackingSpeed * 0.9f, trackingSpeed * 0.9f);
+                        if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 1.5f, -trackingSpeed * 0.9f, trackingSpeed * 0.9f);
                         beatSpeed = 20f;
                     }
                     break;
 
                 case PredatorKind.Piranha:
                     // Quick, nervous zigzag while homing in
-                    if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 2.5f, -trackingSpeed * 1.2f, trackingSpeed * 1.2f);
+                    if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 2.5f, -trackingSpeed * 1.2f, trackingSpeed * 1.2f);
                     targetVx += Mathf.Sin(phase * 0.45f) * 70f;
                     beatSpeed = 14f;
                     break;
 
                 case PredatorKind.Catfish:
-                    if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 1.2f, -trackingSpeed * 0.5f, trackingSpeed * 0.5f);
+                    if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 1.2f, -trackingSpeed * 0.5f, trackingSpeed * 0.5f);
                     beatSpeed = 4.5f;
                     break;
 
                 default:
-                    if (above) targetVx = Mathf.Clamp((playerX - cachedTransform.position.x) * 2.2f, -trackingSpeed, trackingSpeed);
+                    if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 2.2f, -trackingSpeed, trackingSpeed);
                     break;
             }
 
             // Own swimming speed on top of the river flow
             yPosition -= downwardVelocity * dt;
-            Vector3 newPos = cachedTransform.position;
+            Vector3 newPos = myPos;
             newPos.y = yPosition;
             lateralVelocity = Mathf.MoveTowards(lateralVelocity, targetVx, SteerAccel * (kind == PredatorKind.Piranha ? 2f : 1f) * dt);
             newPos.x += lateralVelocity * dt;
