@@ -218,6 +218,10 @@ namespace Upstream.Spawning
         public const float PiranhaFromMeters = 250f;
         public const float PikeFromMeters = 600f;
         public const float CatfishFromMeters = 1000f;
+        /// <summary>The three hunters of the late river, in the order they arrive.</summary>
+        public const float BarracudaFromMeters = 3000f;
+        public const float SwordfishFromMeters = 4000f;
+        public const float AnglerfishFromMeters = 5000f;
         /// <summary>Piranhas come in pairs, then in threes from here on.</summary>
         public const float PiranhaTrioFromMeters = 800f;
 
@@ -256,11 +260,17 @@ namespace Upstream.Spawning
             float piranha = meters >= PiranhaFromMeters ? 0.8f : 0f;
             float pike = meters >= PikeFromMeters ? 0.8f : 0f;
             float catfish = meters >= CatfishFromMeters ? 0.6f : 0f;
-            float t = Mathf.Clamp01(r) * (shark + piranha + pike + catfish);
+            float barracuda = meters >= BarracudaFromMeters ? 0.9f : 0f;
+            float swordfish = meters >= SwordfishFromMeters ? 0.9f : 0f;
+            float angler = meters >= AnglerfishFromMeters ? 0.9f : 0f;
+            float t = Mathf.Clamp01(r) * (shark + piranha + pike + catfish + barracuda + swordfish + angler);
             if ((t -= shark) < 0f) return PredatorKind.Shark;
             if ((t -= piranha) < 0f) return PredatorKind.Piranha;
             if ((t -= pike) < 0f) return PredatorKind.Pike;
-            return catfish > 0f ? PredatorKind.Catfish : PredatorKind.Shark;
+            if ((t -= catfish) < 0f) return PredatorKind.Catfish;
+            if ((t -= barracuda) < 0f) return PredatorKind.Barracuda;
+            if ((t -= swordfish) < 0f) return PredatorKind.Swordfish;
+            return angler > 0f ? PredatorKind.Anglerfish : PredatorKind.Shark;
         }
 
         private float Meters(float distance)
@@ -511,8 +521,9 @@ namespace Upstream.Spawning
             predator.Initialize(playerTransform, spawnConfig);
             predator.kind = kind;
             int largeStageReq = spawnConfig != null ? spawnConfig.largeSharksAfterStage : 3;
-            // Catfish are always "large" (only a very big fish can eat them); sharks get big later on.
-            predator.isLarge = kind == PredatorKind.Catfish ||
+            // Catfish and the late hunters are always "large" (only a very big fish can eat them); sharks get big later on.
+            predator.isLarge = kind == PredatorKind.Catfish || kind == PredatorKind.Barracuda ||
+                               kind == PredatorKind.Swordfish || kind == PredatorKind.Anglerfish ||
                                (kind == PredatorKind.Shark && stage >= largeStageReq && Random.value < 0.42f);
             predator.difficulty = difficulty;
             predator.OnSpawn(pos);

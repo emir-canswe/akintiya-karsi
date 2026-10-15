@@ -15,6 +15,9 @@ namespace Upstream.Data
         public const int Pike = 80;
         public const int BigShark = 90;
         public const int Catfish = 95;
+        public const int Barracuda = 80;
+        public const int Swordfish = 90;
+        public const int Anglerfish = 95;
 
         /// <summary>The smallest hit; two of these must empty even a legendary fish's bar.</summary>
         public const int Min = Piranha;
@@ -26,6 +29,9 @@ namespace Upstream.Data
                 case PredatorKind.Piranha: return Piranha;
                 case PredatorKind.Pike: return Pike;
                 case PredatorKind.Catfish: return Catfish;
+                case PredatorKind.Barracuda: return Barracuda;
+                case PredatorKind.Swordfish: return Swordfish;
+                case PredatorKind.Anglerfish: return Anglerfish;
                 default: return isLarge ? BigShark : Shark;
             }
         }

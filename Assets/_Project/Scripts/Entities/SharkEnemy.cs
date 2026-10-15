@@ -6,11 +6,13 @@ using Upstream.River;
 namespace Upstream.Entities
 {
     /// <summary>
-    /// A river predator (shark, pike, piranha or catfish) swimming downstream at the player. All kinds swim like
+    /// A river predator (shark, pike, piranha, catfish or one of the late hunters) swimming downstream at the player. All kinds swim like
     /// real fish: the tail beats from its base, the body counter-sways and the nose turns into the direction of
     /// travel. Each kind moves differently:
     /// shark chases steadily; pike drifts, shivers as a warning, then lunges; piranhas zigzag in schools;
     /// catfish are slow but big (only a very big fish can eat one).
+    /// The hunters of the late river: barracuda are the fastest and home in hard; swordfish wind up longer and charge
+    /// almost straight (dash sideways to dodge); anglerfish are huge, slow and wide.
     /// </summary>
     public class SharkEnemy : EntityBase
     {
@@ -38,6 +40,9 @@ namespace Upstream.Entities
         private static readonly float[] PikeParts = { -32f, -12f, 8f, 26f };
         private static readonly float[] PiranhaParts = { -6f, 6f };
         private static readonly float[] CatfishParts = { -18f, 2f, 20f };
+        private static readonly float[] SwordfishParts = { -42f, -28f, -10f, 8f, 24f };
+        private const float SwordfishWindup = 0.55f;
+        private const float SwordfishTriggerDistance = 380f;
 
         private float cruiseSpeed;
         private float downwardVelocity = 80f;
@@ -51,15 +56,39 @@ namespace Upstream.Entities
         private SpriteRenderer shadow;
         private SpriteRenderer tailRenderer;
 
-        public float[] HitOffsets => kind == PredatorKind.Pike ? PikeParts
-                                   : kind == PredatorKind.Piranha ? PiranhaParts
-                                   : kind == PredatorKind.Catfish ? CatfishParts
-                                   : SharkParts;
+        public float[] HitOffsets
+        {
+            get
+            {
+                switch (kind)
+                {
+                    case PredatorKind.Pike:
+                    case PredatorKind.Barracuda: return PikeParts;
+                    case PredatorKind.Piranha: return PiranhaParts;
+                    case PredatorKind.Catfish:
+                    case PredatorKind.Anglerfish: return CatfishParts;
+                    case PredatorKind.Swordfish: return SwordfishParts;
+                    default: return SharkParts;
+                }
+            }
+        }
 
-        public float HitRadius => kind == PredatorKind.Pike ? 11f
-                                : kind == PredatorKind.Piranha ? 11f
-                                : kind == PredatorKind.Catfish ? 21f
-                                : 16f;
+        public float HitRadius
+        {
+            get
+            {
+                switch (kind)
+                {
+                    case PredatorKind.Pike:
+                    case PredatorKind.Piranha: return 11f;
+                    case PredatorKind.Barracuda:
+                    case PredatorKind.Swordfish: return 10f;
+                    case PredatorKind.Catfish: return 21f;
+                    case PredatorKind.Anglerfish: return 22f;
+                    default: return 16f;
+                }
+            }
+        }
 
         /// <summary>Current visual scale (large sharks are drawn bigger).</summary>
         public float HitScale => cachedTransform != null ? cachedTransform.localScale.x : 1f;
@@ -114,6 +143,9 @@ namespace Upstream.Entities
                 case PredatorKind.Pike: cruiseSpeed = spd * 0.45f; break;
                 case PredatorKind.Piranha: cruiseSpeed = spd * 0.95f; break;
                 case PredatorKind.Catfish: cruiseSpeed = spd * 0.55f; break;
+                case PredatorKind.Barracuda: cruiseSpeed = spd * 1.25f; break;
+                case PredatorKind.Swordfish: cruiseSpeed = spd * 0.45f; break;
+                case PredatorKind.Anglerfish: cruiseSpeed = spd * 0.6f; break;
                 default: cruiseSpeed = isLarge ? spd * 0.85f : spd; break;
             }
             downwardVelocity = cruiseSpeed;
@@ -143,13 +175,15 @@ namespace Upstream.Entities
             switch (kind)
             {
                 case PredatorKind.Pike:
+                case PredatorKind.Swordfish:
+                    bool sword = kind == PredatorKind.Swordfish;
                     if (pikeTimer < 0f)
                     {
                         // Cruise slowly, stalking: lines up with the player like a shark does
                         if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 2f, -trackingSpeed, trackingSpeed);
-                        if (playerTransform != null && yPosition - playerPos.y < PikeTriggerDistance) pikeTimer = 0f;
+                        if (playerTransform != null && yPosition - playerPos.y < (sword ? SwordfishTriggerDistance : PikeTriggerDistance)) pikeTimer = 0f;
                     }
-                    else if (pikeTimer < PikeWindup)
+                    else if (pikeTimer < (sword ? SwordfishWindup : PikeWindup))
                     {
                         // Wind-up: nearly stops and shivers (the warning), aiming at the player
                         pikeTimer += dt;
@@ -161,11 +195,25 @@ namespace Upstream.Entities
                     else
                     {
                         // Lunge: fast, still bending a little toward the player (a quick sideways dash dodges it)
-                        float lunge = Mathf.Lerp(PikeLungeEasy, PikeLungeHard, Mathf.Clamp01(difficulty));
+                        float lunge = Mathf.Lerp(PikeLungeEasy, PikeLungeHard, Mathf.Clamp01(difficulty)) * (sword ? 1.4f : 1f);
                         downwardVelocity = Mathf.MoveTowards(downwardVelocity, lunge, 1800f * dt);
-                        if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 1.5f, -trackingSpeed * 0.9f, trackingSpeed * 0.9f);
+                        // A swordfish barely steers once it charges: a sideways dash is the way out.
+                        float steer = sword ? 0.3f : 0.9f;
+                        if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 1.5f, -trackingSpeed * steer, trackingSpeed * steer);
                         beatSpeed = 20f;
                     }
+                    break;
+
+                case PredatorKind.Barracuda:
+                    // The fastest swimmer: homes in hard and tight, tail whipping
+                    if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 3f, -trackingSpeed * 1.5f, trackingSpeed * 1.5f);
+                    beatSpeed = 18f;
+                    break;
+
+                case PredatorKind.Anglerfish:
+                    // Huge and slow: drifts toward the player with lazy, heavy tail beats
+                    if (above) targetVx = Mathf.Clamp((playerX - myPos.x) * 1.4f, -trackingSpeed * 0.8f, trackingSpeed * 0.8f);
+                    beatSpeed = 5f;
                     break;
 
                 case PredatorKind.Piranha:

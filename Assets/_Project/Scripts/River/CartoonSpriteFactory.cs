@@ -514,7 +514,8 @@ namespace Upstream.River
             public Color spine, back, side, belly, finDark, finLit, outline, gill;
             public float finT = 0.42f, finOut = 21f, finLen = 15f, finThick = 5f, finAngle = 32f;
             public float eyeT = 0.17f, eyeSize = 1f;
-            public bool dorsal, gills, teeth, whiskers, spots, blotches, brows;
+            public bool dorsal, gills, teeth, whiskers, spots, blotches, brows, stripes, lure;
+            public float billLen;                // swordfish bill beyond the nose (px)
             public float tailAttach;             // px above the pivot where the tail joins
             public float tailScale = 1f;
             public bool roundTail;
@@ -558,6 +559,36 @@ namespace Upstream.River
                         finDark = Hex("#5A4A33"), finLit = Hex("#8C7550"), outline = Hex("#24190E"), gill = Hex("#33281C"),
                         finT = 0.33f, finOut = 26f, finLen = 15f, finThick = 6f, finAngle = 25f,
                         eyeT = 0.13f, eyeSize = 0.75f, whiskers = true, blotches = true, tailAttach = 27f, tailScale = 1.05f, roundTail = true,
+                    };
+                case Data.PredatorKind.Barracuda:
+                    // Long silver torpedo with dark bars across the back and a toothy jaw
+                    return new PredatorSpec
+                    {
+                        nose = 54f, tailEnd = 48f, halfWidth = 10.5f, a = 0.6f, b = 0.5f,
+                        spine = Hex("#3C4E62"), back = Hex("#6F8AA3"), side = Hex("#B9CAD8"), belly = Hex("#F2F6FA"),
+                        finDark = Hex("#4F6479"), finLit = Hex("#9FB4C6"), outline = Hex("#1A2533"), gill = Hex("#2C3E50"),
+                        finT = 0.55f, finOut = 12f, finLen = 9f, finThick = 3.5f, finAngle = 30f,
+                        eyeT = 0.12f, eyeSize = 1.05f, stripes = true, teeth = true, gills = true, tailAttach = 44f, tailScale = 0.9f,
+                    };
+                case Data.PredatorKind.Swordfish:
+                    // Deep-blue sprinter with a tall sail fin and a long bill
+                    return new PredatorSpec
+                    {
+                        nose = 38f, billLen = 16f, tailEnd = 40f, halfWidth = 14f, a = 0.5f, b = 0.6f,
+                        spine = Hex("#2A3F6B"), back = Hex("#3F63A0"), side = Hex("#8FB0D8"), belly = Hex("#EAF2FB"),
+                        finDark = Hex("#243759"), finLit = Hex("#4F72B0"), outline = Hex("#101C35"), gill = Hex("#1D2F52"),
+                        finT = 0.45f, finOut = 17f, finLen = 12f, finThick = 4f, finAngle = 30f,
+                        eyeT = 0.2f, eyeSize = 1f, dorsal = true, gills = true, tailAttach = 33f, tailScale = 1f,
+                    };
+                case Data.PredatorKind.Anglerfish:
+                    // Huge purple deep-sea lurker: blotchy skin, big teeth and a glowing orb dangling from its snout
+                    return new PredatorSpec
+                    {
+                        nose = 30f, tailEnd = 34f, halfWidth = 25f, a = 0.4f, b = 0.55f,
+                        spine = Hex("#2B1E45"), back = Hex("#4A3470"), side = Hex("#7A5BA8"), belly = Hex("#B79BD6"),
+                        finDark = Hex("#3A2A5C"), finLit = Hex("#6B4FA0"), outline = Hex("#150E26"), gill = Hex("#241838"),
+                        finT = 0.4f, finOut = 24f, finLen = 13f, finThick = 6f, finAngle = 28f,
+                        eyeT = 0.22f, eyeSize = 1.3f, teeth = true, blotches = true, lure = true, tailAttach = 25f, tailScale = 0.95f, roundTail = true,
                     };
                 default:
                     // Shark: slate-blue back over a pale belly rim, gill slits, shaded dorsal fin
@@ -625,10 +656,36 @@ namespace Upstream.River
                 return d;
             }
 
-            Sdf sdf = p => Mathf.Min(SmoothMin(Body(p), Fins(p), 4f), Whiskers(p));
+            // Swordfish bill: a tapering spike past the nose
+            float Bill(Vector2 p)
+            {
+                if (sp.billLen <= 0f) return 99f;
+                float y0 = noseY + 3f, y1 = noseY - sp.billLen;
+                float bt = Mathf.Clamp01((y0 - p.y) / (y0 - y1));
+                return (p - new Vector2(c.x, Mathf.Lerp(y0, y1, bt))).magnitude - Mathf.Lerp(2.4f, 0.7f, bt);
+            }
+            // Anglerfish lure: a thin stalk curling forward from the snout, ending in a glowing orb
+            Vector2 orb = new Vector2(c.x + 9f, noseY - 17f);
+            float Stalk(Vector2 p)
+            {
+                if (!sp.lure) return 99f;
+                Vector2 a0 = new Vector2(c.x, noseY + 6f), a1 = orb;
+                Vector2 ab = a1 - a0;
+                float st = Mathf.Clamp01(Vector2.Dot(p - a0, ab) / ab.sqrMagnitude);
+                return (p - (a0 + ab * st)).magnitude - 1.2f;
+            }
+            float Orb(Vector2 p) => sp.lure ? (p - orb).magnitude - 6.5f : 99f;
+
+            Sdf sdf = p => Mathf.Min(Mathf.Min(SmoothMin(Body(p), Fins(p), 4f), Whiskers(p)), Mathf.Min(Bill(p), Mathf.Min(Stalk(p), Orb(p))));
             Fill fill = (p, d) =>
             {
-                if (Whiskers(p) < 0f && Body(p) > 0f) return sp.finDark;
+                if (Orb(p) < 0f)
+                {
+                    float orbR = (p - orb).magnitude / 6.5f;
+                    return Color.Lerp(Hex("#FFF8C2"), Hex("#FFC93C"), Mathf.Clamp01(orbR * 1.1f));
+                }
+                if (Body(p) > 0f && (Whiskers(p) < 0f || Stalk(p) < 0f)) return sp.finDark;
+                if (Body(p) > 0f && Bill(p) < 0f) return sp.finLit;
                 float t = Mathf.Clamp01((p.y - noseY) / (tailY - noseY));
                 float hw = Mathf.Max(HalfWidth(t), 0.01f);
                 float across = Mathf.Abs(p.x - c.x) / hw;
@@ -656,6 +713,8 @@ namespace Upstream.River
                             (inCell.x * inCell.x * 4f + inCell.y * inCell.y * 9f) < 0.5f)
                             col = Color.Lerp(col, sp.belly, 0.7f);
                     }
+                    if (sp.stripes && across < 0.75f && t > 0.25f && t < 0.9f && Frac(t * 9f) < 0.3f)
+                        col = Color.Lerp(col, sp.spine, 0.7f);
                     if (sp.blotches)
                     {
                         float n = Mathf.PerlinNoise(p.x * 0.18f + 7f, p.y * 0.18f + 3f);

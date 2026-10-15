@@ -166,6 +166,26 @@ namespace Upstream.Tests
             CollectionAssert.AreEquivalent(new[] { PredatorKind.Shark, PredatorKind.Piranha, PredatorKind.Pike }, KindsAt(SpawnManager.PikeFromMeters));
             CollectionAssert.AreEquivalent(new[] { PredatorKind.Shark, PredatorKind.Piranha, PredatorKind.Pike, PredatorKind.Catfish },
                 KindsAt(SpawnManager.CatfishFromMeters));
+
+            // The late hunters arrive one by one at 3000, 4000 and 5000 m.
+            Assert.IsFalse(KindsAt(2999f).Contains(PredatorKind.Barracuda));
+            Assert.IsTrue(KindsAt(3000f).Contains(PredatorKind.Barracuda));
+            Assert.IsFalse(KindsAt(3999f).Contains(PredatorKind.Swordfish));
+            Assert.IsTrue(KindsAt(4000f).Contains(PredatorKind.Swordfish));
+            Assert.IsFalse(KindsAt(4999f).Contains(PredatorKind.Anglerfish));
+            Assert.IsTrue(KindsAt(5000f).Contains(PredatorKind.Anglerfish));
+            Assert.AreEqual(7, KindsAt(5000f).Count, "every predator is on the river at 5000 m");
+        }
+
+        [Test]
+        public void EveryPredator_HasArtAndAHit_OfAtLeastTheMinimum()
+        {
+            foreach (PredatorKind kind in System.Enum.GetValues(typeof(PredatorKind)))
+            {
+                Assert.IsNotNull(Upstream.River.CartoonSpriteFactory.GetPredatorBody(kind), kind.ToString());
+                Assert.IsNotNull(Upstream.River.CartoonSpriteFactory.GetPredatorTail(kind), kind.ToString());
+                Assert.GreaterOrEqual(HitDamage.ForPredator(kind, true), HitDamage.Min, kind.ToString());
+            }
         }
 
         [Test]
