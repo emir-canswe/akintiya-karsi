@@ -86,29 +86,20 @@ namespace Upstream.Tests
         // --- Interstitial frequency ---
 
         [Test]
-        public void Interstitial_NeverInFirstGames()
+        public void Interstitial_EveryFifthGame()
         {
-            for (int games = 0; games <= InterstitialPolicy.GraceGamesCount; games++)
-            {
-                Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(games, false));
-            }
-        }
-
-        [Test]
-        public void Interstitial_EveryThirdGameAfterGrace()
-        {
+            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(0, false));
             Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(4, false));
-            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(5, false));
-            Assert.IsTrue(InterstitialPolicy.ShouldShowInterstitial(6, false));
-            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(7, false));
-            Assert.IsTrue(InterstitialPolicy.ShouldShowInterstitial(9, false));
+            Assert.IsTrue(InterstitialPolicy.ShouldShowInterstitial(5, false));
+            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(6, false));
+            Assert.IsTrue(InterstitialPolicy.ShouldShowInterstitial(10, false));
         }
 
         [Test]
         public void Interstitial_NotAfterRewardedContinue_NorWhenAdsRemoved()
         {
-            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(6, usedRewardedContinueThisRun: true));
-            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(6, false, adsRemoved: true));
+            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(5, usedRewardedContinueThisRun: true));
+            Assert.IsFalse(InterstitialPolicy.ShouldShowInterstitial(5, false, adsRemoved: true));
         }
 
         // --- Persistent progression ---
