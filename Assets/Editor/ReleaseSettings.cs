@@ -16,8 +16,8 @@ namespace Upstream.EditorTools
     /// </summary>
     public static class ReleaseSettings
     {
-        public const string Version = "0.1.0";
-        public const int VersionCode = 1;
+        public const string Version = "0.1.1";
+        public const int VersionCode = 2;
 
         private const string IconFolder = "Assets/_Project/Art/UI";
         private const string IconPath = IconFolder + "/AppIcon.png";

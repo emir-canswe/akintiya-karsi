@@ -14,19 +14,20 @@ namespace Upstream.Audio
         {
             if (manager == null) return;
 
-            AudioClip eatFood = CreatePluck("SFX_EatFood", 540f, 760f, 0.09f, 0.25f);
-            AudioClip eatGold = CreateChordChime("SFX_EatGold", new[] { 659.25f, 830.61f, 987.77f }, 0.34f, 0.30f);
-            AudioClip turboStart = CreateSweep("SFX_TurboStart", 280f, 880f, 0.55f, 0.26f, true);
-            AudioClip turboLoop = CreateWaterRushLoop("SFX_TurboLoop", 0.8f, 0.14f);
-            AudioClip hurt = CreateSweep("SFX_Hurt", 150f, 65f, 0.28f, 0.32f, false, true);
-            AudioClip die = CreateSweep("SFX_Die", 260f, 68f, 0.75f, 0.28f, true);
-            AudioClip sharkEat = CreateSharkDevourSound("SFX_SharkEat");
-            AudioClip stageUp = CreateChordChime("SFX_StageUp", new[] { 523.25f, 659.25f, 783.99f, 1046.5f }, 0.48f, 0.32f);
-            AudioClip click = CreatePluck("SFX_Click", 620f, 700f, 0.05f, 0.18f);
-            AudioClip ambient = CreateAmbientStreamLoop("AMB_River", 3.0f, 0.08f);
+            // Load high-quality WAV clips from Resources/Audio if available, fallback to procedural synthesis
+            AudioClip eatFood = Resources.Load<AudioClip>("Audio/SFX_EatFood") ?? CreatePluck("SFX_EatFood", 540f, 760f, 0.09f, 0.25f);
+            AudioClip eatGold = Resources.Load<AudioClip>("Audio/SFX_EatGold") ?? CreateChordChime("SFX_EatGold", new[] { 659.25f, 830.61f, 987.77f }, 0.34f, 0.30f);
+            AudioClip turboStart = Resources.Load<AudioClip>("Audio/SFX_TurboStart") ?? CreateSweep("SFX_TurboStart", 280f, 880f, 0.55f, 0.26f, true);
+            AudioClip turboLoop = Resources.Load<AudioClip>("Audio/SFX_TurboLoop") ?? CreateWaterRushLoop("SFX_TurboLoop", 0.8f, 0.14f);
+            AudioClip hurt = Resources.Load<AudioClip>("Audio/SFX_Hurt") ?? CreateSweep("SFX_Hurt", 150f, 65f, 0.28f, 0.32f, false, true);
+            AudioClip die = Resources.Load<AudioClip>("Audio/SFX_Die") ?? CreateSweep("SFX_Die", 260f, 68f, 0.75f, 0.28f, true);
+            AudioClip sharkEat = Resources.Load<AudioClip>("Audio/SFX_SharkEat") ?? CreateSharkDevourSound("SFX_SharkEat");
+            AudioClip stageUp = Resources.Load<AudioClip>("Audio/SFX_StageUp") ?? CreateChordChime("SFX_StageUp", new[] { 523.25f, 659.25f, 783.99f, 1046.5f }, 0.48f, 0.32f);
+            AudioClip click = Resources.Load<AudioClip>("Audio/SFX_Click") ?? CreatePluck("SFX_Click", 620f, 700f, 0.05f, 0.18f);
+            AudioClip ambient = Resources.Load<AudioClip>("Audio/AMB_River") ?? CreateAmbientStreamLoop("AMB_River", 3.0f, 0.08f);
 
             manager.SetClips(eatFood, eatGold, turboStart, turboLoop, hurt, die, sharkEat, stageUp, click, ambient);
-            manager.SetWaveSplash(CreateWaveSplash("SFX_WaveSplash", 0.7f, 0.34f));
+            manager.SetWaveSplash(Resources.Load<AudioClip>("Audio/SFX_WaveSplash") ?? CreateWaveSplash("SFX_WaveSplash", 0.7f, 0.34f));
         }
 
         private static AudioClip CreatePluck(string name, float startFreq, float endFreq, float duration, float volume)

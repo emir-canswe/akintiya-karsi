@@ -131,6 +131,13 @@ namespace Upstream.EditorTools
             EditorApplication.Exit(ok ? 0 : 1);
         }
 
+        /// <summary>Same as <see cref="BuildAndroidApkCli"/> but builds the signed Play Store AAB.</summary>
+        public static void BuildAndroidAabCli()
+        {
+            bool ok = BuildAndroid(appBundle: true);
+            EditorApplication.Exit(ok ? 0 : 1);
+        }
+
         /// <summary>
         /// Exports the iPhone/iPad Xcode project to Builds/iOS. Needs Unity's "iOS Build Support" module;
         /// the app itself is then built and signed in Xcode on a Mac (Apple Developer account required).
