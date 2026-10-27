@@ -118,8 +118,12 @@ namespace Upstream.Core
 #endif
         }
 
+        /// <summary>Real time of the last StartGame; lets audio tell the start-stage announcement from a real stage-up.</summary>
+        public static float RunStartTime { get; private set; } = -10f;
+
         public void StartGame()
         {
+            RunStartTime = Time.unscaledTime;
             StopAllCoroutines();
             Time.timeScale = 1f;
             AudioListener.pause = false;

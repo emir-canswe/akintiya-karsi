@@ -271,9 +271,9 @@ namespace Upstream.Tests
             while (!AdsManager.Instance.IsInitialized && Time.realtimeSinceStartup < waitUntil) yield return null;
             Assert.IsTrue(AdsManager.Instance.IsInitialized);
 
-            // Make this the 6th game -> interstitial is due when tapping "Play Again".
+            // Make this the 5th game (the counter goes up by one) -> interstitial is due when tapping "Play Again".
             var save = SaveSystem.Load();
-            save.totalGamesPlayed = 5;
+            save.totalGamesPlayed = 4;
             SaveSystem.Save(save);
 
             gm.StartGame();

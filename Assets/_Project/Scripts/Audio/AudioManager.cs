@@ -30,6 +30,10 @@ namespace Upstream.Audio
         [SerializeField] private AudioClip buttonClick;
         [SerializeField] private AudioClip ambientWater;
         [SerializeField] private AudioClip waveSplash;
+        [SerializeField] private AudioClip shieldBubble;
+        [SerializeField] private AudioClip turboRelease;
+        [SerializeField] private AudioClip[] stageVoices;
+        [SerializeField] private AudioClip[] startVoices;
 
         private AudioSource turboSource;
         private TurboSystem turboSystem;
@@ -72,6 +76,50 @@ namespace Upstream.Audio
 
         /// <summary>Crashing-water sound for the big speed-limit waves.</summary>
         public void SetWaveSplash(AudioClip clip) => waveSplash = clip;
+
+        /// <summary>Bubble pop for the shield, the turbo release swish and the voice lines said on a growth stage-up.</summary>
+        private static readonly System.Collections.Generic.Dictionary<string, string[]> VoiceLines = new System.Collections.Generic.Dictionary<string, string[]>
+        {
+            { "hurt", new[] { "Oops", "Ouch", "UhOh" } },
+            { "lowhp", new[] { "Careful" } },
+            { "eat", new[] { "Yum", "Gotcha", "Chomp" } },
+            { "turbo", new[] { "Zoom", "Wheee", "SuperSpeed" } },
+            { "shield", new[] { "Bounce" } },
+            { "surge", new[] { "WaveBig", "HoldOn" } },
+            { "bigwave", new[] { "Splash" } },
+            { "died", new[] { "OhNo", "TryAgain" } },
+            { "continue", new[] { "BackIn", "KeepGoing" } },
+            { "coin", new[] { "Shiny", "Sparkle" } },
+            { "stage", new[] { "GrowUp", "YouDidIt", "Hooray", "GreatSwimming", "SoStrong" } },
+        };
+        private readonly System.Collections.Generic.Dictionary<string, AudioClip[]> voiceClips = new System.Collections.Generic.Dictionary<string, AudioClip[]>();
+        private float nextVoiceTime;
+
+        /// <summary>Plays a random kid-voice line for the event; a shared cooldown keeps them from piling up or nagging.</summary>
+        private void Say(string key, float chance = 1f, float cooldown = 3f)
+        {
+            if (isMuted || Time.unscaledTime < nextVoiceTime || Random.value > chance) return;
+            if (!voiceClips.TryGetValue(key, out AudioClip[] clips))
+            {
+                string[] names = VoiceLines[key];
+                clips = new AudioClip[names.Length];
+                for (int i = 0; i < names.Length; i++) clips[i] = Resources.Load<AudioClip>("Audio/VO_" + names[i]);
+                voiceClips[key] = clips;
+            }
+            AudioClip clip = clips[Random.Range(0, clips.Length)];
+            if (clip == null) return;
+            nextVoiceTime = Time.unscaledTime + cooldown;
+            PlaySFX(clip, 1f);
+        }
+
+        public void SetStartVoices(AudioClip[] voices) => startVoices = voices;
+
+        public void SetAccentClips(AudioClip bubble, AudioClip release, AudioClip[] voices)
+        {
+            shieldBubble = bubble;
+            turboRelease = release;
+            stageVoices = voices;
+        }
 
         private void Awake()
         {
@@ -126,6 +174,8 @@ namespace Upstream.Audio
             GameEvents.OnPlayerDied += HandlePlayerDied;
             GameEvents.OnSharkEaten += HandleSharkEaten;
             GameEvents.OnGrowthStageChanged += HandleGrowthStageChanged;
+            GameEvents.OnGameStart += HandleGameStart;
+            GameEvents.OnContinueUsed += HandleContinueUsed;
             GameEvents.OnCoinCollected += HandleCoinCollected;
             GameEvents.OnWaveHit += HandleWaveHit;
             GameEvents.OnShieldBlocked += HandleShieldBlocked;
@@ -142,6 +192,8 @@ namespace Upstream.Audio
             GameEvents.OnPlayerDied -= HandlePlayerDied;
             GameEvents.OnSharkEaten -= HandleSharkEaten;
             GameEvents.OnGrowthStageChanged -= HandleGrowthStageChanged;
+            GameEvents.OnGameStart -= HandleGameStart;
+            GameEvents.OnContinueUsed -= HandleContinueUsed;
             GameEvents.OnCoinCollected -= HandleCoinCollected;
             GameEvents.OnWaveHit -= HandleWaveHit;
             GameEvents.OnShieldBlocked -= HandleShieldBlocked;
@@ -238,7 +290,11 @@ namespace Upstream.Audio
 #endif
 
         // Bright "ding": the gold-food chime pitched up, slightly varied so a coin trail sounds lively.
-        private void HandleCoinCollected(int amount) => PlaySFXPitchVaried(eatGoldFood, 1.75f, 1.95f);
+        private void HandleCoinCollected(int amount)
+        {
+            PlaySFXPitchVaried(eatGoldFood, 1.75f, 1.95f);
+            Say("coin", 0.06f, 6f);
+        }
 
         // Low "whoosh": the hurt sound pitched down, plus a short buzz.
         private void HandleWaveHit()
@@ -248,18 +304,24 @@ namespace Upstream.Audio
         }
 
         // Distant rumble as the set appears, a full crash as each big wave breaks over the fish.
-        private void HandleWaveSurge() => PlaySFX(waveSplash, 0.55f);
+        private void HandleWaveSurge()
+        {
+            PlaySFX(waveSplash, 0.55f);
+            Say("surge", 1f, 4f);
+        }
 
         private void HandleBigWaveHit()
         {
             PlaySFXPitchVaried(waveSplash, 0.9f, 1.1f);
+            Say("bigwave", 0.5f);
             Vibrate(45);
         }
 
-        // Shield pop: a bright high chime instead of the hurt sound
+        // Shield pop: a bubble bursting instead of the hurt sound
         private void HandleShieldBlocked(int chargesLeft)
         {
-            PlaySFX(eatGoldFood, 1.35f);
+            PlaySFX(shieldBubble != null ? shieldBubble : eatGoldFood, shieldBubble != null ? 1f : 1.35f);
+            Say("shield", 0.7f);
             Vibrate(25);
         }
 
@@ -268,6 +330,7 @@ namespace Upstream.Audio
             if (isGold)
             {
                 PlaySFX(eatGoldFood, 1f);
+                Say("eat", 0.25f, 5f);
             }
             else
             {
@@ -281,6 +344,7 @@ namespace Upstream.Audio
         private void HandleTurboStart()
         {
             PlaySFX(turboStart, 1f);
+            Say("turbo", 0.6f, 5f);
 
             if (!isMuted && turboLoop != null && sfxSources != null)
             {
@@ -302,6 +366,12 @@ namespace Upstream.Audio
 
         private void HandleTurboEnd()
         {
+            StopTurboLoop();
+            PlaySFX(turboRelease, 0.9f);
+        }
+
+        private void StopTurboLoop()
+        {
             if (turboSource != null)
             {
                 turboSource.Stop();
@@ -313,20 +383,39 @@ namespace Upstream.Audio
         private void HandlePlayerHurt(int currentHp)
         {
             PlaySFX(hurt, 1f);
+            Say(currentHp <= 40 && currentHp > 0 ? "lowhp" : "hurt", 0.8f, 3f);
             Vibrate(80);
         }
 
         private void HandlePlayerDied()
         {
-            HandleTurboEnd();
+            StopTurboLoop();
             PlaySFX(die, 1f);
+            nextVoiceTime = 0f;
+            Say("died");
             Vibrate(150);
         }
 
         private void HandleSharkEaten()
         {
             PlaySFX(sharkEat, 1f);
+            Say("eat", 0.8f, 3f);
             Vibrate(90);
+        }
+
+        private void HandleContinueUsed()
+        {
+            nextVoiceTime = 0f;
+            Say("continue");
+        }
+
+        private void HandleGameStart()
+        {
+            if (startVoices != null && startVoices.Length > 0)
+            {
+                AudioClip clip = startVoices[Random.Range(0, startVoices.Length)];
+                if (clip != null) PlaySFX(clip, 1f);
+            }
         }
 
         private void HandleGrowthStageChanged(int stage)
@@ -334,6 +423,11 @@ namespace Upstream.Audio
             if (stage > 0)
             {
                 PlaySFX(stageUp, 1f + stage * 0.06f);
+                if (Time.unscaledTime - GameManager.RunStartTime > 1.5f)
+                {
+                    nextVoiceTime = 0f;
+                    Say("stage");
+                }
                 Vibrate(60);
             }
         }

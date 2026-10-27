@@ -15,7 +15,7 @@ namespace Upstream.Audio
             if (manager == null) return;
 
             // Load high-quality WAV clips from Resources/Audio if available, fallback to procedural synthesis
-            AudioClip eatFood = Resources.Load<AudioClip>("Audio/SFX_EatFood") ?? CreatePluck("SFX_EatFood", 540f, 760f, 0.09f, 0.25f);
+            AudioClip eatFood = Resources.Load<AudioClip>("Audio/SFX_EatCute") ?? Resources.Load<AudioClip>("Audio/SFX_EatFood") ?? CreatePluck("SFX_EatFood", 540f, 760f, 0.09f, 0.25f);
             AudioClip eatGold = Resources.Load<AudioClip>("Audio/SFX_EatGold") ?? CreateChordChime("SFX_EatGold", new[] { 659.25f, 830.61f, 987.77f }, 0.34f, 0.30f);
             AudioClip turboStart = Resources.Load<AudioClip>("Audio/SFX_TurboStart") ?? CreateSweep("SFX_TurboStart", 280f, 880f, 0.55f, 0.26f, true);
             AudioClip turboLoop = Resources.Load<AudioClip>("Audio/SFX_TurboLoop") ?? CreateWaterRushLoop("SFX_TurboLoop", 0.8f, 0.14f);
@@ -28,6 +28,18 @@ namespace Upstream.Audio
 
             manager.SetClips(eatFood, eatGold, turboStart, turboLoop, hurt, die, sharkEat, stageUp, click, ambient);
             manager.SetWaveSplash(Resources.Load<AudioClip>("Audio/SFX_WaveSplash") ?? CreateWaveSplash("SFX_WaveSplash", 0.7f, 0.34f));
+
+            // Hand-made accents: null-safe in AudioManager, so a missing file just means silence for that event.
+            manager.SetAccentClips(
+                Resources.Load<AudioClip>("Audio/SFX_SwimBubble"),
+                Resources.Load<AudioClip>("Audio/SFX_SwimSwish"),
+                null);
+            manager.SetStartVoices(new[]
+            {
+                Resources.Load<AudioClip>("Audio/VO_LetsGo"),
+                Resources.Load<AudioClip>("Audio/VO_HereWeGo"),
+                Resources.Load<AudioClip>("Audio/VO_LetsSwim"),
+            });
         }
 
         private static AudioClip CreatePluck(string name, float startFreq, float endFreq, float duration, float volume)

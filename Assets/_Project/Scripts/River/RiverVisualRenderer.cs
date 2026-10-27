@@ -49,6 +49,9 @@ namespace Upstream.River
         private float bubbleTimer;
         private Color glowColor, deepColor;
 
+        /// <summary>Current mid water color of the region being swum through (waves tint themselves with it).</summary>
+        public static Color WaterColor { get; private set; } = new Color(0.2f, 0.77f, 0.9f);
+
         public void Configure(RiverController controller, GameConfig config)
         {
             riverController = controller;
@@ -378,6 +381,7 @@ namespace Upstream.River
                 if (glow != glowColor) { glowColor = glow; waterGlow.color = glow; }
                 Color deep = Color.Lerp(deepColor, reg.waterColor2, k);
                 if (deep != deepColor) { deepColor = deep; waterDeep.color = deep; }
+                WaterColor = Color.Lerp(glowColor, deepColor, 0.4f);
             }
 
             // Tiled layers scroll with the river (pattern repeats every tile, so wrap the offset).

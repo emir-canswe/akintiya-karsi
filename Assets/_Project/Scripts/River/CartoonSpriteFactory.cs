@@ -29,6 +29,7 @@ namespace Upstream.River
         }
 
         private static float Frac(float v) => v - Mathf.Floor(v);
+        private static Color Gray(float v) => new Color(v, v, v, 1f);
 
         /// <summary>
         /// GLSL-style smoothstep: 0 below <paramref name="edge0"/>, 1 above <paramref name="edge1"/>, smooth between.
@@ -392,7 +393,8 @@ namespace Upstream.River
             if (wave != null) return wave;
             const int w = 128, h = 40;
             Vector2 c = new Vector2(w * 0.5f, 21f);
-            Color back = Hex("#2F6FE0"), front = Hex("#5FC8FF"), foam = Color.white, outline = Hex("#163C8C");
+            // Painted in greys: WaveObstacle tints it with the current water color every frame.
+            Color back = Gray(0.8f), front = Gray(0.95f), foam = Color.white, outline = Gray(0.58f);
             Sdf sdf = p =>
             {
                 float band = SdBox(p, c, new Vector2(62f, 13f), 13f);
@@ -407,7 +409,7 @@ namespace Upstream.River
                 Color col = Color.Lerp(front, back, t);
                 // Curl lines across the wave
                 float curl = Mathf.Abs(Frac((p.x + Mathf.Sin(p.y * 0.35f) * 4f) / 16f) - 0.5f);
-                if (curl < 0.05f && p.y > 16f) col = Color.Lerp(col, Color.white, 0.35f);
+                if (curl < 0.05f && p.y > 16f) col = Color.Lerp(col, Color.white, 0.5f);
                 // Foam crest
                 col = Color.Lerp(col, foam, Mathf.Clamp01((14f - p.y) / 4f));
                 return Shine(col, p, new Vector2(p.x, 28f), 4f, 0.25f);
@@ -426,8 +428,9 @@ namespace Upstream.River
         {
             if (bigWave != null) return bigWave;
             const int w = 128, h = 80;
-            Color lip = Hex("#1F5CC4"), face = Hex("#3C8FEA"), back = Hex("#7FD6FF"), outline = Hex("#163C8C");
-            Color foamShade = Hex("#CDEFFF");
+            // Greys again (tinted by the water color at runtime): dark lip, mid face, bright sunlit back.
+            Color lip = Gray(0.6f), face = Gray(0.8f), back = Gray(0.97f), outline = Gray(0.6f);
+            Color foamShade = Gray(0.92f);
             var px = new Color[w * h];
             for (int y = 0; y < h; y++)
             {

@@ -205,7 +205,7 @@ namespace Upstream.Data
                 new FishDef { id = 18, nameTr = "Kristal Balık", nameEn = "Crystal Fish", price = 25000, rarity = FishRarity.Legendary, ability = FishAbility.Agile,
                     body = C("#8FE3FF"), belly = C("#F0FCFF"), accent = C("#FFFFFF"), fin = C("#C9F3FF"), tail = C("#6FD0F5"), pattern = FishPattern.Facets,
                     width = 1.05f, glow = new Color(0.6f, 0.95f, 1f, 0.42f), extraHeart = true },
-                new FishDef { id = 19, nameTr = "Gökkuşağı Efsanesi", nameEn = "Rainbow Legend", price = 30000, rarity = FishRarity.Legendary, ability = FishAbility.Magnet,
+                new FishDef { id = 19, nameTr = "Fata", nameEn = "Fata", price = 30000, rarity = FishRarity.Legendary, ability = FishAbility.Magnet,
                     body = C("#FFFFFF"), belly = C("#FFFFFF"), accent = C("#FFFFFF"), fin = C("#FFFFFF"), tail = C("#FFFFFF"), pattern = FishPattern.Rainbow,
                     length = 1.08f, tailSize = 1.35f, glow = new Color(1f, 1f, 1f, 0.42f), extraHeart = true },
             };

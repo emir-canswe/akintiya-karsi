@@ -36,6 +36,14 @@ namespace Upstream.Entities
         private float phase;
         private float fade;
         private float rise;
+        private float alphaNow = 1f;
+
+        // Light streaks that drift sideways across the wave (some each way), so the water looks alive.
+        private const int MaxStreaks = 10;
+        private Transform[] streak;
+        private SpriteRenderer[] streakRenderers;
+        private float[] streakP, streakSpeed;
+        private int streakCount;
 
         // Big wave parts, built the first time this pooled object is used as a big wave.
         private GameObject bigParts;
@@ -80,6 +88,8 @@ namespace Upstream.Entities
                 body.size = new Vector2(width, 36f);
                 if (bigParts != null) bigParts.SetActive(false);
             }
+            EnsureStreaks();
+            ResetStreaks();
             ApplyAlpha(1f);
         }
 
@@ -142,28 +152,91 @@ namespace Upstream.Entities
             {
                 // A big wave keeps rolling on past the fish for a moment before it dies down.
                 fade = Mathf.Max(0f, fade - dt * (isBig ? 0.9f : 2.5f));
-                ApplyAlpha(fade);
+                alphaNow = fade;
             }
             else if (isBig && rise < 1f)
             {
-                ApplyAlpha(Mathf.Clamp01(rise * 2f));
+                alphaNow = Mathf.Clamp01(rise * 2f);
             }
+            ApplyTint();
+            TickStreaks(dt);
         }
 
         private void ApplyAlpha(float a)
         {
-            SetAlpha(body, a);
-            if (!isBig || bigParts == null) return;
-            SetAlpha(foamFront, a);
-            SetAlpha(foamBack, a * 0.75f);
+            alphaNow = a;
+            ApplyTint();
         }
 
-        private static void SetAlpha(SpriteRenderer sr, float a)
+        /// <summary>Colors the wave from the river's current water color; the body breathes a little brighter and darker.</summary>
+        private void ApplyTint()
         {
-            if (sr == null) return;
-            Color c = sr.color;
-            c.a = a;
-            sr.color = c;
+            Color water = RiverVisualRenderer.WaterColor;
+            float pulse = 1f + Mathf.Sin(phase * 0.8f) * 0.05f;
+            Color t = Color.Lerp(water, Color.white, 0.5f);
+            body.color = new Color(Mathf.Min(1f, t.r * pulse), Mathf.Min(1f, t.g * pulse), Mathf.Min(1f, t.b * pulse), alphaNow);
+            if (!isBig || bigParts == null) return;
+            Color foam = Color.Lerp(Color.white, water, 0.12f);
+            foam.a = alphaNow;
+            foamFront.color = foam;
+            foam.a = alphaNow * 0.75f;
+            foamBack.color = foam;
+        }
+
+        private void EnsureStreaks()
+        {
+            if (streak != null) return;
+            var root = new GameObject("Streaks");
+            root.transform.SetParent(transform, false);
+            streak = new Transform[MaxStreaks];
+            streakRenderers = new SpriteRenderer[MaxStreaks];
+            streakP = new float[MaxStreaks];
+            streakSpeed = new float[MaxStreaks];
+            Sprite dot = WatercolorSpriteFactory.GetCircleSprite();
+            for (int i = 0; i < MaxStreaks; i++)
+            {
+                var go = new GameObject("Streak");
+                go.transform.SetParent(root.transform, false);
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = dot;
+                sr.sortingOrder = body.sortingOrder + 1;
+                sr.color = new Color(1f, 1f, 1f, 0f);
+                streak[i] = go.transform;
+                streakRenderers[i] = sr;
+            }
+        }
+
+        private void ResetStreaks()
+        {
+            streakCount = isBig ? MaxStreaks : 5;
+            for (int i = 0; i < MaxStreaks; i++)
+            {
+                streakRenderers[i].enabled = i < streakCount;
+                if (i >= streakCount) continue;
+                streakP[i] = Random.value;
+                float dir = i % 2 == 0 ? 1f : -1f;
+                streakSpeed[i] = dir * Random.Range(0.1f, 0.26f);
+                float len = isBig ? Random.Range(14f, 30f) : Random.Range(9f, 17f);
+                float thick = isBig ? Random.Range(2f, 3.4f) : Random.Range(1.5f, 2.4f);
+                streak[i].localScale = new Vector3(len, thick, 1f);
+                float y = isBig ? Random.Range(-10f, 26f) : Random.Range(-7f, 6f);
+                streak[i].localPosition = new Vector3(0f, y, 0f);
+            }
+        }
+
+        private void TickStreaks(float dt)
+        {
+            for (int i = 0; i < streakCount; i++)
+            {
+                float p = streakP[i] + streakSpeed[i] * dt;
+                p -= Mathf.Floor(p);
+                streakP[i] = p;
+                Vector3 pos = streak[i].localPosition;
+                pos.x = Mathf.Lerp(-0.46f, 0.46f, p) * width;
+                streak[i].localPosition = pos;
+                // Fade in and out at the ends of its run.
+                streakRenderers[i].color = new Color(1f, 1f, 1f, Mathf.Sin(p * Mathf.PI) * 0.55f * alphaNow);
+            }
         }
 
         private void TickSpray(float dt)
